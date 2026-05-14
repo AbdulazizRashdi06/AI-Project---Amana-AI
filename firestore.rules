@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+      );
+    }
+
+    function ownsReport(report) {
+      return signedIn() && report.data.ownerUid == request.auth.uid;
+    }
+
+    function participantInChat(chat) {
+      return signedIn() && request.auth.uid in chat.data.participantUids;
+    }
+
+    function allowedReportCreate() {
+      return signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.type in ["lost", "found"]
+        && request.resource.data.status == "open"
+        && request.resource.data.aiProcessingStatus == "pending";
+    }
+
+    function safeReportUpdate() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      return ownsReport(resource)
+        && resource.data.status != "hidden"
+        && !changed.hasAny([
+          "ownerUid",
+          "embedding",
+          "embeddingModel",
+          "normalizedText",
+          "aiProcessingStatus",
+          "aiProcessingError",
+          "visibility"
+        ]);
+    }
+
+    match /users/{uid} {
+      allow create: if signedIn() && uid == request.auth.uid && request.resource.data.role == "user";
+      allow read: if signedIn() && (uid == request.auth.uid || isAdmin());
+      allow update: if signedIn()
+        && uid == request.auth.uid
+        && !request.resource.data.diff(resource.data).changedKeys().hasAny(["role", "uid", "email"]);
+      allow delete: if false;
+    }
+
+    match /reports/{reportId} {
+      allow create: if allowedReportCreate();
+      allow read: if ownsReport(resource) || isAdmin();
+      allow update: if isAdmin() || safeReportUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if isAdmin()
+        || (signedIn() && (
+          resource.data.lostOwnerUid == request.auth.uid ||
+          resource.data.foundOwnerUid == request.auth.uid
+        ));
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAdmin() || participantInChat(resource);
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAdmin()
+          || participantInChat(get(/databases/$(database)/documents/chats/$(chatId)));
+        allow create: if signedIn()
+          && participantInChat(get(/databases/$(database)/documents/chats/$(chatId)))
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 1000;
+        allow update, delete: if false;
+      }
+    }
+
+    match /settings/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create, delete: if isAdmin();
+    }
+
+    match /aiLogs/{logId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

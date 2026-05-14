@@ -25,13 +25,19 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+expo-web.*.log
+expo-go.*.log
+design-reference/
+stitch_ai_amana_lost_and_found.zip
 
 # macOS
 .DS_Store
 *.pem
 
 # local env files
+.env
 .env*.local
+functions/.env
 
 # typescript
 *.tsbuildinfo
