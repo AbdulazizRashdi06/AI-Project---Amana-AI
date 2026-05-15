@@ -88,7 +88,7 @@ export default function ReportScreen() {
       <View style={styles.actionGrid}>
         <Pressable
           onPress={() => setType("lost")}
-          style={[styles.actionCard, styles.lostCard, type === "lost" ? styles.selectedLostCard : styles.inactiveCard]}
+          style={[styles.actionCard, type === "lost" ? styles.selectedLostCard : styles.unselectedLostCard]}
         >
           {type === "lost" ? (
             <View style={[styles.selectedBadge, styles.selectedBadgeLost]}>
@@ -96,17 +96,17 @@ export default function ReportScreen() {
               <Text style={styles.selectedBadgeText}>Lost Item Selected</Text>
             </View>
           ) : null}
-          <View style={styles.actionIconLost}>
-            <SearchX color="#fff" size={26} />
+          <View style={[styles.actionIconLost, type !== "lost" && styles.actionIconLostUnselected]}>
+            <SearchX color={type === "lost" ? "#fff" : colors.primary} size={26} />
           </View>
           <View>
-            <Text style={styles.lostTitle}>Report Lost Item</Text>
-            <Text style={styles.lostBody}>File a secure report for an item misplaced on campus.</Text>
+            <Text style={[styles.lostTitle, type !== "lost" && styles.unselectedLostTitle]}>Report Lost Item</Text>
+            <Text style={[styles.lostBody, type !== "lost" && styles.unselectedLostBody]}>File a secure report for an item misplaced on campus.</Text>
           </View>
         </Pressable>
         <Pressable
           onPress={() => setType("found")}
-          style={[styles.actionCard, styles.foundCard, type === "found" ? styles.selectedFoundCard : styles.inactiveCard]}
+          style={[styles.actionCard, type === "found" ? styles.selectedFoundCard : styles.unselectedFoundCard]}
         >
           {type === "found" ? (
             <View style={[styles.selectedBadge, styles.selectedBadgeFound]}>
@@ -114,12 +114,12 @@ export default function ReportScreen() {
               <Text style={[styles.selectedBadgeText, styles.selectedBadgeTextFound]}>Found Item Selected</Text>
             </View>
           ) : null}
-          <View style={styles.actionIconFound}>
+          <View style={[styles.actionIconFound, type !== "found" && styles.actionIconFoundUnselected]}>
             <CheckCircle color={colors.secondary} size={26} />
           </View>
           <View>
-            <Text style={styles.foundTitle}>Report Found Item</Text>
-            <Text style={styles.foundBody}>Help the community by logging a found item.</Text>
+            <Text style={[styles.foundTitle, type !== "found" && styles.unselectedFoundTitle]}>Report Found Item</Text>
+            <Text style={[styles.foundBody, type !== "found" && styles.unselectedFoundBody]}>Help the community by logging a found item.</Text>
           </View>
         </Pressable>
       </View>
@@ -235,15 +235,24 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   selectedLostCard: {
-    borderColor: "#ffffff",
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryMuted,
     borderWidth: 3,
   },
   selectedFoundCard: {
+    backgroundColor: colors.gold,
     borderColor: colors.secondary,
     borderWidth: 3,
   },
-  inactiveCard: {
-    opacity: 0.72,
+  unselectedLostCard: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryMuted,
+    borderWidth: 1,
+  },
+  unselectedFoundCard: {
+    backgroundColor: colors.goldSoft,
+    borderColor: "#d8bf66",
+    borderWidth: 1,
   },
   selectedBadge: {
     position: "absolute",
@@ -288,6 +297,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  actionIconLostUnselected: {
+    backgroundColor: "rgba(0,30,64,0.12)",
+  },
   actionIconFound: {
     height: 48,
     width: 48,
@@ -296,25 +308,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  actionIconFoundUnselected: {
+    backgroundColor: "rgba(118,91,0,0.14)",
+  },
   lostTitle: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "900",
+  },
+  unselectedLostTitle: {
+    color: colors.primary,
   },
   lostBody: {
     color: colors.primarySoft,
     lineHeight: 20,
     marginTop: 6,
   },
+  unselectedLostBody: {
+    color: colors.primary,
+    opacity: 0.85,
+  },
   foundTitle: {
     color: colors.secondary,
     fontSize: 20,
     fontWeight: "900",
   },
+  unselectedFoundTitle: {
+    color: colors.secondary,
+  },
   foundBody: {
     color: colors.secondary,
     lineHeight: 20,
     marginTop: 6,
+  },
+  unselectedFoundBody: {
+    color: colors.secondary,
+    opacity: 0.85,
   },
   formGrid: {
     flexDirection: "column",
