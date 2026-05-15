@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { Camera, CheckCircle, Plus, SearchX, X } from "lucide-react-native";
+import { Camera, Check, CheckCircle, Plus, SearchX, X } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
@@ -86,7 +86,16 @@ export default function ReportScreen() {
         <Text style={styles.body}>File a secure lost or found report. AI Amana will compare item details, location, date, and photos.</Text>
       </View>
       <View style={styles.actionGrid}>
-        <Pressable onPress={() => setType("lost")} style={[styles.actionCard, styles.lostCard, type === "lost" && styles.selectedCard]}>
+        <Pressable
+          onPress={() => setType("lost")}
+          style={[styles.actionCard, styles.lostCard, type === "lost" ? styles.selectedLostCard : styles.inactiveCard]}
+        >
+          {type === "lost" ? (
+            <View style={[styles.selectedBadge, styles.selectedBadgeLost]}>
+              <Check size={14} color="#fff" />
+              <Text style={styles.selectedBadgeText}>Lost Item Selected</Text>
+            </View>
+          ) : null}
           <View style={styles.actionIconLost}>
             <SearchX color="#fff" size={26} />
           </View>
@@ -95,7 +104,16 @@ export default function ReportScreen() {
             <Text style={styles.lostBody}>File a secure report for an item misplaced on campus.</Text>
           </View>
         </Pressable>
-        <Pressable onPress={() => setType("found")} style={[styles.actionCard, styles.foundCard, type === "found" && styles.selectedCard]}>
+        <Pressable
+          onPress={() => setType("found")}
+          style={[styles.actionCard, styles.foundCard, type === "found" ? styles.selectedFoundCard : styles.inactiveCard]}
+        >
+          {type === "found" ? (
+            <View style={[styles.selectedBadge, styles.selectedBadgeFound]}>
+              <Check size={14} color={colors.secondary} />
+              <Text style={[styles.selectedBadgeText, styles.selectedBadgeTextFound]}>Found Item Selected</Text>
+            </View>
+          ) : null}
           <View style={styles.actionIconFound}>
             <CheckCircle color={colors.secondary} size={26} />
           </View>
@@ -138,7 +156,13 @@ export default function ReportScreen() {
           </View>
           {message ? <Text style={styles.errorMessage}>{message}</Text> : null}
           {success ? <Text style={styles.successMessage}>{success}</Text> : null}
-          <Button title={type === "lost" ? "Submit Lost Report" : "Submit Found Report"} loading={loading} onPress={submitReport} icon={<Plus color="#fff" size={20} />} />
+          <Button
+            title={type === "lost" ? "Submit Lost Report" : "Submit Found Report"}
+            variant={type === "lost" ? "primary" : "gold"}
+            loading={loading}
+            onPress={submitReport}
+            icon={<Plus color={type === "lost" ? "#fff" : colors.secondary} size={20} />}
+          />
         </View>
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>Reports are cross-referenced against opposite item reports. Mention unique marks, contents, brand, or scratches.</Text>
@@ -210,8 +234,45 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
-  selectedCard: {
-    borderColor: colors.primaryMuted,
+  selectedLostCard: {
+    borderColor: "#ffffff",
+    borderWidth: 3,
+  },
+  selectedFoundCard: {
+    borderColor: colors.secondary,
+    borderWidth: 3,
+  },
+  inactiveCard: {
+    opacity: 0.72,
+  },
+  selectedBadge: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  selectedBadgeLost: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+  },
+  selectedBadgeFound: {
+    backgroundColor: "rgba(255,255,255,0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(118,91,0,0.35)",
+  },
+  selectedBadgeText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  selectedBadgeTextFound: {
+    color: colors.secondary,
   },
   lostCard: {
     backgroundColor: colors.primary,
