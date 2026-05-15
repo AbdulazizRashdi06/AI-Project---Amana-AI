@@ -94,7 +94,25 @@ async function startChatForMatchViaCallable(matchId: string): Promise<string> {
 
 function shouldFallbackToFirestore(error: unknown): boolean {
   const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
-  return code === "functions/not-found" || code === "functions/unavailable";
+  const message =
+    typeof error === "object" && error && "message" in error
+      ? String((error as { message?: unknown }).message ?? "").toLowerCase()
+      : "";
+
+  if (["functions/not-found", "functions/unavailable", "functions/internal", "functions/unknown", "functions/deadline-exceeded"].includes(code)) {
+    return true;
+  }
+
+  return [
+    "cors",
+    "preflight",
+    "access-control-allow-origin",
+    "failed to fetch",
+    "net::err_failed",
+    "net::err_blocked_by_client",
+    "response is not valid json",
+    "404",
+  ].some((token) => message.includes(token));
 }
 
 export async function startChatForMatch(matchId: string): Promise<string> {
