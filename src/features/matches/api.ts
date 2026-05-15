@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
-import { auth, db } from "@/firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { auth, db, functions } from "@/firebase/config";
 import type { MatchRecord } from "@/types/domain";
 
 type SnapshotHandler<T> = (items: T[]) => void;
@@ -71,12 +72,40 @@ async function startChatForMatchViaFirestore(matchId: string): Promise<string> {
     });
   }
 
-  await updateDoc(matchRef, { status: "chat_started", updatedAt: serverTimestamp() });
+  try {
+    await updateDoc(matchRef, { status: "chat_started", updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.warn("Could not update match status to chat_started", error);
+  }
   return matchId;
 }
 
+async function startChatForMatchViaCallable(matchId: string): Promise<string> {
+  const callable = httpsCallable<{ matchId: string }, { chatId: string }>(functions, "startChatForMatch");
+  const response = await callable({ matchId });
+  const chatId = response.data?.chatId;
+
+  if (!chatId) {
+    throw new Error("Chat service did not return a chat id.");
+  }
+
+  return chatId;
+}
+
+function shouldFallbackToFirestore(error: unknown): boolean {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  return code === "functions/not-found" || code === "functions/unavailable";
+}
+
 export async function startChatForMatch(matchId: string): Promise<string> {
-  return startChatForMatchViaFirestore(matchId);
+  try {
+    return await startChatForMatchViaCallable(matchId);
+  } catch (error) {
+    if (shouldFallbackToFirestore(error)) {
+      return startChatForMatchViaFirestore(matchId);
+    }
+    throw error;
+  }
 }
 
 export async function dismissMatch(matchId: string) {
