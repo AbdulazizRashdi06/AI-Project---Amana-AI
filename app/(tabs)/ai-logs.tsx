@@ -199,7 +199,7 @@ export default function AiLogsScreen() {
     <Screen>
       <View style={styles.header}>
         <Text style={styles.kicker}>AI Activity Feed</Text>
-        <Text style={styles.title}>Report Matching Story</Text>
+        <Text style={styles.title}>Report Matching Logs</Text>
         <Text style={styles.body}>This page explains each AI matching action in plain language for every lost and found report.</Text>
         <View style={styles.actions}>
           <Button title="Clear logs" variant="ghost" onPress={() => setCleared(true)} />
