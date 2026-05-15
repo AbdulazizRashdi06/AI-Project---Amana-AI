@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from "expo-router";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { ClipboardList, FileSearch, MessageCircle, SearchCheck, ShieldCheck, UserRound } from "lucide-react-native";
+import { ClipboardList, FileSearch, FileText, MessageCircle, SearchCheck, ShieldCheck, UserRound } from "lucide-react-native";
 import { useAuth } from "@/features/auth/AuthContext";
 import { colors } from "@/theme/colors";
 
@@ -34,6 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="matches" options={{ title: "Matches", tabBarIcon: ({ color }) => <SearchCheck color={color} size={20} /> }} />
       <Tabs.Screen name="chats" options={{ title: "Chats", tabBarIcon: ({ color }) => <MessageCircle color={color} size={20} /> }} />
       <Tabs.Screen name="ai-logs" options={{ title: "Logs", tabBarIcon: ({ color }) => <FileSearch color={color} size={20} /> }} />
+      <Tabs.Screen name="presentation-log" options={{ title: "Story", tabBarIcon: ({ color }) => <FileText color={color} size={20} /> }} />
       <Tabs.Screen name="my-items" options={{ title: "Items", tabBarIcon: ({ color }) => <ShieldCheck color={color} size={20} /> }} />
       <Tabs.Screen name="profile" options={{ title: profile?.role === "admin" ? "Admin" : "Profile", tabBarIcon: ({ color }) => <UserRound color={color} size={20} /> }} />
     </Tabs>
