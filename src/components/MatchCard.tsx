@@ -7,8 +7,11 @@ import type { MatchRecord } from "@/types/domain";
 
 export function MatchCard({ match }: { match: MatchRecord }) {
   const label = scoreToLabel(match.finalScore);
-  const lostPhoto = match.lostSummary?.photoUrls?.[0] ?? match.foundSummary?.photoUrls?.[0] ?? null;
-  const foundPhoto = match.foundSummary?.photoUrls?.[0] ?? match.lostSummary?.photoUrls?.[0] ?? null;
+  const lostPhoto = match.lostSummary?.photoUrls?.[0] ?? null;
+  const foundPhoto = match.foundSummary?.photoUrls?.[0] ?? null;
+  const hasSinglePhoto = Boolean(lostPhoto) !== Boolean(foundPhoto);
+  const singlePhotoUrl = lostPhoto ?? foundPhoto;
+  const singlePhotoLabel = lostPhoto ? "Photo from lost report" : "Photo from found report";
 
   return (
     <View style={styles.card}>
@@ -19,9 +22,15 @@ export function MatchCard({ match }: { match: MatchRecord }) {
         </View>
         <Text style={styles.status}>{match.status.replace("_", " ")}</Text>
       </View>
+      {hasSinglePhoto && singlePhotoUrl ? (
+        <View style={styles.singlePhotoWrap}>
+          <Image source={{ uri: singlePhotoUrl }} style={styles.singlePhoto} />
+          <Text style={styles.singlePhotoTag}>{singlePhotoLabel}</Text>
+        </View>
+      ) : null}
       <View style={styles.summaryGrid}>
-        <Summary label="Lost" summary={match.lostSummary} fallbackId={match.lostReportId} photoUrl={lostPhoto} />
-        <Summary label="Found" summary={match.foundSummary} fallbackId={match.foundReportId} photoUrl={foundPhoto} />
+        <Summary label="Lost" summary={match.lostSummary} fallbackId={match.lostReportId} photoUrl={lostPhoto} showImage={!hasSinglePhoto} />
+        <Summary label="Found" summary={match.foundSummary} fallbackId={match.foundReportId} photoUrl={foundPhoto} showImage={!hasSinglePhoto} />
       </View>
       <Text style={styles.body}>{match.explanation || "AI is comparing item details and photos for this pair."}</Text>
       {match.matchedFields?.length ? <Text style={styles.fields}>Matched: {match.matchedFields.join(", ")}</Text> : null}
@@ -34,15 +43,19 @@ function Summary({
   summary,
   fallbackId,
   photoUrl,
+  showImage,
 }: {
   label: "Lost" | "Found";
   summary: MatchRecord["lostSummary"];
   fallbackId: string;
   photoUrl?: string | null;
+  showImage?: boolean;
 }) {
   return (
     <View style={styles.summary}>
-      {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.image} /> : <View style={styles.imagePlaceholder} />}
+      {showImage ? (
+        photoUrl ? <Image source={{ uri: photoUrl }} style={styles.image} /> : <View style={styles.imagePlaceholder} />
+      ) : null}
       <View style={styles.summaryLabelRow}>
         {label === "Found" ? <ShieldCheck color={colors.primary} size={14} /> : null}
         <Text style={styles.summaryLabel}>{label}</Text>
@@ -99,6 +112,21 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontWeight: "700",
     textTransform: "capitalize",
+  },
+  singlePhotoWrap: {
+    gap: 6,
+  },
+  singlePhoto: {
+    width: "100%",
+    aspectRatio: 2.1,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+  },
+  singlePhotoTag: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   title: {
     color: colors.ink,
