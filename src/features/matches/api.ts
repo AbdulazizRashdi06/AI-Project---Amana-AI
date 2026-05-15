@@ -1,7 +1,5 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { Platform } from "react-native";
-import { auth, db, functions } from "@/firebase/config";
+import { auth, db } from "@/firebase/config";
 import type { MatchRecord } from "@/types/domain";
 
 type SnapshotHandler<T> = (items: T[]) => void;
@@ -78,22 +76,11 @@ async function startChatForMatchViaFirestore(matchId: string): Promise<string> {
 }
 
 export async function startChatForMatch(matchId: string): Promise<string> {
-  if (Platform.OS === "web") {
-    return startChatForMatchViaFirestore(matchId);
-  }
-
-  try {
-    const callable = httpsCallable<{ matchId: string }, { chatId: string }>(functions, "startChatForMatch");
-    const result = await callable({ matchId });
-    return result.data.chatId;
-  } catch {
-    return startChatForMatchViaFirestore(matchId);
-  }
+  return startChatForMatchViaFirestore(matchId);
 }
 
 export async function dismissMatch(matchId: string) {
-  const callable = httpsCallable<{ matchId: string }, { ok: boolean }>(functions, "dismissMatch");
-  await callable({ matchId });
+  await updateDoc(doc(db, "matches", matchId), { status: "dismissed", updatedAt: serverTimestamp() });
 }
 
 export async function updateMatchStatusLocal(matchId: string, status: MatchRecord["status"]) {
