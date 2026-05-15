@@ -108,30 +108,6 @@ export default function ReportScreen() {
         </Pressable>
       </View>
       <View style={styles.formGrid}>
-        <View style={styles.mediaColumn}>
-          <View style={styles.mediaCard}>
-            <Text style={styles.sectionLabel}>Visual Evidence</Text>
-            <Pressable accessibilityRole="button" style={styles.dropzone} onPress={addPhoto}>
-              <Camera color={colors.outline} size={34} />
-              <Text style={styles.dropzoneText}>Click to upload item photos</Text>
-              <Text style={styles.dropzoneSubtext}>Up to {maxPhotosPerReport} images</Text>
-            </Pressable>
-            <View style={styles.photoGrid}>
-              {photoUris.map((uri) => (
-                <View key={uri} style={styles.photoWrap}>
-                  <Image source={{ uri }} style={styles.photo} />
-                  <Pressable accessibilityRole="button" onPress={() => setPhotoUris((current) => current.filter((item) => item !== uri))} style={styles.removePhoto}>
-                    <X size={16} color="#fff" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-            <Button title="Add Photo" variant="gold" onPress={addPhoto} icon={<Camera color={colors.secondary} size={18} />} />
-          </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>Reports are cross-referenced against opposite item reports. Mention unique marks, contents, brand, or scratches.</Text>
-          </View>
-        </View>
         <View style={styles.formCard}>
           <Text style={styles.sectionLabel}>Item Details</Text>
           <TextField label="Item title" value={title} onChangeText={setTitle} placeholder="Blue Dell XPS 15 laptop" />
@@ -153,9 +129,31 @@ export default function ReportScreen() {
             multiline
             placeholder="Describe brand, color, contents, unique marks, and any useful context..."
           />
+          <View style={styles.mediaCard}>
+            <Text style={styles.sectionLabel}>Visual Evidence</Text>
+            <Pressable accessibilityRole="button" style={styles.dropzone} onPress={addPhoto}>
+              <Camera color={colors.outline} size={34} />
+              <Text style={styles.dropzoneText}>Click to upload item photos</Text>
+              <Text style={styles.dropzoneSubtext}>Up to {maxPhotosPerReport} images</Text>
+            </Pressable>
+            <View style={styles.photoGrid}>
+              {photoUris.map((uri) => (
+                <View key={uri} style={styles.photoWrap}>
+                  <Image source={{ uri }} style={styles.photo} />
+                  <Pressable accessibilityRole="button" onPress={() => setPhotoUris((current) => current.filter((item) => item !== uri))} style={styles.removePhoto}>
+                    <X size={16} color="#fff" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+            <Button title="Add Photo" variant="gold" onPress={addPhoto} icon={<Camera color={colors.secondary} size={18} />} />
+          </View>
           {message ? <Text style={styles.errorMessage}>{message}</Text> : null}
           {success ? <Text style={styles.successMessage}>{success}</Text> : null}
           <Button title={type === "lost" ? "Submit Lost Report" : "Submit Found Report"} loading={loading} onPress={submitReport} icon={<Plus color="#fff" size={20} />} />
+        </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoText}>Reports are cross-referenced against opposite item reports. Mention unique marks, contents, brand, or scratches.</Text>
         </View>
       </View>
     </Screen>
@@ -275,11 +273,6 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: "flex-start",
   },
-  mediaColumn: {
-    flexGrow: 1,
-    width: "100%",
-    gap: 16,
-  },
   formCard: {
     flexGrow: 2,
     width: "100%",
@@ -291,11 +284,11 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   mediaCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 8,
+    padding: 16,
     gap: 16,
   },
   sectionLabel: {
@@ -306,7 +299,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   dropzone: {
-    aspectRatio: 1,
+    minHeight: 150,
     borderWidth: 2,
     borderStyle: "dashed",
     borderColor: colors.border,
