@@ -7,6 +7,8 @@ import type { MatchRecord } from "@/types/domain";
 
 export function MatchCard({ match }: { match: MatchRecord }) {
   const label = scoreToLabel(match.finalScore);
+  const lostPhoto = match.lostSummary?.photoUrls?.[0] ?? match.foundSummary?.photoUrls?.[0] ?? null;
+  const foundPhoto = match.foundSummary?.photoUrls?.[0] ?? match.lostSummary?.photoUrls?.[0] ?? null;
 
   return (
     <View style={styles.card}>
@@ -18,8 +20,8 @@ export function MatchCard({ match }: { match: MatchRecord }) {
         <Text style={styles.status}>{match.status.replace("_", " ")}</Text>
       </View>
       <View style={styles.summaryGrid}>
-        <Summary label="Lost" summary={match.lostSummary} fallbackId={match.lostReportId} />
-        <Summary label="Found" summary={match.foundSummary} fallbackId={match.foundReportId} />
+        <Summary label="Lost" summary={match.lostSummary} fallbackId={match.lostReportId} photoUrl={lostPhoto} />
+        <Summary label="Found" summary={match.foundSummary} fallbackId={match.foundReportId} photoUrl={foundPhoto} />
       </View>
       <Text style={styles.body}>{match.explanation || "AI is comparing item details and photos for this pair."}</Text>
       {match.matchedFields?.length ? <Text style={styles.fields}>Matched: {match.matchedFields.join(", ")}</Text> : null}
@@ -31,14 +33,16 @@ function Summary({
   label,
   summary,
   fallbackId,
+  photoUrl,
 }: {
   label: "Lost" | "Found";
   summary: MatchRecord["lostSummary"];
   fallbackId: string;
+  photoUrl?: string | null;
 }) {
   return (
     <View style={styles.summary}>
-      {summary?.photoUrls?.[0] ? <Image source={{ uri: summary.photoUrls[0] }} style={styles.image} /> : <View style={styles.imagePlaceholder} />}
+      {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.image} /> : <View style={styles.imagePlaceholder} />}
       <View style={styles.summaryLabelRow}>
         {label === "Found" ? <ShieldCheck color={colors.primary} size={14} /> : null}
         <Text style={styles.summaryLabel}>{label}</Text>
