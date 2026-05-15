@@ -27,9 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "experiments": {
-      "baseUrl": "/AI-Project---Amana-AI"
-    },
     "plugins": [
       "expo-router"
     ]
