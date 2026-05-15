@@ -59,7 +59,7 @@ export default function ProfileScreen() {
     const confirmed = await confirmThreeWarnings([
       {
         title: "Warning 1 of 3",
-        message: "This will permanently delete all your AI logs.",
+        message: "This will permanently delete AI logs for all users.",
       },
       {
         title: "Warning 2 of 3",
@@ -67,7 +67,7 @@ export default function ProfileScreen() {
       },
       {
         title: "Warning 3 of 3",
-        message: "Are you absolutely sure you want to permanently delete all AI logs?",
+        message: "Are you absolutely sure you want to permanently delete all users' AI logs?",
       },
     ]);
 
@@ -94,15 +94,15 @@ export default function ProfileScreen() {
     const confirmed = await confirmThreeWarnings([
       {
         title: "Warning 1 of 3",
-        message: "This will permanently delete your app data, but keep your account.",
+        message: "This will permanently delete app data for all users, but keep accounts.",
       },
       {
         title: "Warning 2 of 3",
-        message: "This removes your reports, matches, chats, photos, and AI logs.",
+        message: "This removes all reports, matches, chats, photos, and AI logs.",
       },
       {
         title: "Warning 3 of 3",
-        message: "Final check: continue deleting all your data except your account?",
+        message: "Final check: continue deleting all app data except user accounts?",
       },
     ]);
 
@@ -138,12 +138,14 @@ export default function ProfileScreen() {
       </View>
       {profile?.role === "admin" ? <Button title="Open admin dashboard" variant="secondary" onPress={() => router.push("/admin")} /> : null}
       <Button title="Seed 20 lost reports" variant="ghost" onPress={addDemoData} loading={seeding} />
-      <View style={styles.dangerPanel}>
-        <Text style={styles.dangerTitle}>Danger zone</Text>
-        <Text style={styles.dangerBody}>These actions are permanent and cannot be undone.</Text>
-        <Button title="Delete all logs permanently" variant="danger" onPress={handleDeleteAllLogs} loading={deletingLogs} disabled={deletingData} />
-        <Button title="Delete data (all except account)" variant="danger" onPress={handleDeleteDataExceptAccount} loading={deletingData} disabled={deletingLogs} />
-      </View>
+      {profile?.role === "admin" ? (
+        <View style={styles.dangerPanel}>
+          <Text style={styles.dangerTitle}>Admin danger zone</Text>
+          <Text style={styles.dangerBody}>These actions are global and permanent. They affect all users.</Text>
+          <Button title="Delete ALL logs permanently" variant="danger" onPress={handleDeleteAllLogs} loading={deletingLogs} disabled={deletingData} />
+          <Button title="Delete ALL data (except accounts)" variant="danger" onPress={handleDeleteDataExceptAccount} loading={deletingData} disabled={deletingLogs} />
+        </View>
+      ) : null}
       <Button title="Sign out" variant="danger" onPress={signOutUser} />
     </Screen>
   );

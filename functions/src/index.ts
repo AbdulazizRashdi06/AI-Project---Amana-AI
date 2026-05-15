@@ -33,6 +33,21 @@ async function deleteQueryBatch(
   return deleted;
 }
 
+async function deleteCollectionBatch(collectionName: string): Promise<number> {
+  let deleted = 0;
+  while (true) {
+    const snapshot = await db.collection(collectionName).limit(400).get();
+    if (snapshot.empty) {
+      break;
+    }
+    const batch = db.batch();
+    snapshot.docs.forEach((item) => batch.delete(item.ref));
+    await batch.commit();
+    deleted += snapshot.size;
+  }
+  return deleted;
+}
+
 async function deleteChatWithMessages(chatId: string): Promise<void> {
   while (true) {
     const messages = await db.collection("chats").doc(chatId).collection("messages").limit(400).get();
@@ -278,81 +293,39 @@ export const adminUpdateReportStatus = onCall({ cors: true, invoker: "public" },
 export const deleteAllMyLogs = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
-  const deleted = await deleteQueryBatch("aiLogs", "ownerUid", "==", uid);
+  if (!(await isAdmin(uid, request.auth?.token.admin === true))) {
+    throw new HttpsError("permission-denied", "Admin role required.");
+  }
+
+  const deleted = await deleteCollectionBatch("aiLogs");
   return { ok: true, deleted };
 });
 
 export const deleteMyDataExceptAccount = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
+  if (!(await isAdmin(uid, request.auth?.token.admin === true))) {
+    throw new HttpsError("permission-denied", "Admin role required.");
+  }
 
-  const reportSnapshot = await db.collection("reports").where("ownerUid", "==", uid).get();
+  const reportSnapshot = await db.collection("reports").get();
   const reportIds = reportSnapshot.docs.map((item) => item.id);
   const photoPaths = reportSnapshot.docs.flatMap((item) => {
     const value = item.data()?.photoStoragePaths;
     return Array.isArray(value) ? value.filter((path): path is string => typeof path === "string") : [];
   });
 
-  const chatIds = new Set<string>();
-  const allMatchDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  const matchSnapshot = await db.collection("matches").get();
+  const uniqueMatchIds = new Set(matchSnapshot.docs.map((item) => item.id));
 
-  for (const reportId of reportIds) {
-    const [lostMatches, foundMatches] = await Promise.all([
-      db.collection("matches").where("lostReportId", "==", reportId).get(),
-      db.collection("matches").where("foundReportId", "==", reportId).get(),
-    ]);
-    lostMatches.docs.forEach((item) => {
-      chatIds.add(item.id);
-      allMatchDocs.push(item);
-    });
-    foundMatches.docs.forEach((item) => {
-      chatIds.add(item.id);
-      allMatchDocs.push(item);
-    });
-  }
-
-  const uniqueMatchIds = Array.from(new Set(allMatchDocs.map((item) => item.id)));
+  const chatSnapshot = await db.collection("chats").get();
+  const chatIds = new Set(chatSnapshot.docs.map((item) => item.id));
   for (const chatId of chatIds) {
     await deleteChatWithMessages(chatId);
   }
-
-  // Delete any leftover chats that still include this user.
-  while (true) {
-    const participantChats = await db.collection("chats").where("participantUids", "array-contains", uid).limit(100).get();
-    if (participantChats.empty) {
-      break;
-    }
-    for (const chat of participantChats.docs) {
-      await deleteChatWithMessages(chat.id);
-    }
-  }
-
-  const matchDeleteIds = new Set(uniqueMatchIds);
-  while (true) {
-    const lostOwned = await db.collection("matches").where("lostOwnerUid", "==", uid).limit(200).get();
-    const foundOwned = await db.collection("matches").where("foundOwnerUid", "==", uid).limit(200).get();
-    if (lostOwned.empty && foundOwned.empty) {
-      break;
-    }
-    lostOwned.docs.forEach((item) => matchDeleteIds.add(item.id));
-    foundOwned.docs.forEach((item) => matchDeleteIds.add(item.id));
-    const batch = db.batch();
-    lostOwned.docs.forEach((item) => batch.delete(item.ref));
-    foundOwned.docs.forEach((item) => batch.delete(item.ref));
-    await batch.commit();
-  }
-
-  while (true) {
-    const reports = await db.collection("reports").where("ownerUid", "==", uid).limit(200).get();
-    if (reports.empty) {
-      break;
-    }
-    const batch = db.batch();
-    reports.docs.forEach((item) => batch.delete(item.ref));
-    await batch.commit();
-  }
-
-  const deletedLogs = await deleteQueryBatch("aiLogs", "ownerUid", "==", uid);
+  const deletedMatches = await deleteCollectionBatch("matches");
+  const deletedReports = await deleteCollectionBatch("reports");
+  const deletedLogs = await deleteCollectionBatch("aiLogs");
 
   await Promise.all(
     photoPaths.map(async (path) => {
@@ -368,8 +341,8 @@ export const deleteMyDataExceptAccount = onCall({ cors: true, invoker: "public" 
     ok: true,
     deleted: {
       logs: deletedLogs,
-      reports: reportIds.length,
-      matches: matchDeleteIds.size,
+      reports: deletedReports || reportIds.length,
+      matches: deletedMatches || uniqueMatchIds.size,
       chats: chatIds.size,
       photos: photoPaths.length,
     },
