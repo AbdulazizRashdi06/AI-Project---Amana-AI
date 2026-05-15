@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Screen } from "@/components/Screen";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -184,13 +185,15 @@ export default function AiLogsScreen() {
   const { user } = useAuth();
   const { logs, loading, error } = useUserAiLogs(user?.uid);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [cleared, setCleared] = useState(false);
+  const visibleLogs = cleared ? [] : logs;
   const grouped = useMemo(() => {
     const byReport = new Map<string, AiLogRecord[]>();
-    for (const log of logs) {
+    for (const log of visibleLogs) {
       byReport.set(log.reportId, [...(byReport.get(log.reportId) ?? []), log]);
     }
     return Array.from(byReport.entries());
-  }, [logs]);
+  }, [visibleLogs]);
 
   return (
     <Screen>
@@ -198,9 +201,13 @@ export default function AiLogsScreen() {
         <Text style={styles.kicker}>AI Activity Feed</Text>
         <Text style={styles.title}>Report Matching Story</Text>
         <Text style={styles.body}>This page explains each AI matching action in plain language for every lost and found report.</Text>
+        <View style={styles.actions}>
+          <Button title="Clear logs" variant="ghost" onPress={() => setCleared(true)} />
+          {cleared ? <Button title="Show logs" variant="secondary" onPress={() => setCleared(false)} /> : null}
+        </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!loading && logs.length === 0 ? (
+      {!loading && visibleLogs.length === 0 ? (
         <EmptyState title="No AI logs yet" body="Create or update a lost/found report after deploying the Functions update. The next matching run will appear here." />
       ) : null}
       {grouped.map(([reportId, reportLogs]) => (
@@ -265,6 +272,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     lineHeight: 22,
     maxWidth: 840,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
   },
   reportGroup: {
     gap: 10,
