@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
+import { deleteAllMyLogs, deleteMyDataExceptAccount } from "@/features/account/api";
 import { useAuth } from "@/features/auth/AuthContext";
 import { seedDemoReports } from "@/features/reports/api";
 import { defaultSettings } from "@/lib/constants";
@@ -12,6 +13,27 @@ import { colors } from "@/theme/colors";
 export default function ProfileScreen() {
   const { user, profile, signOutUser } = useAuth();
   const [seeding, setSeeding] = useState(false);
+  const [deletingLogs, setDeletingLogs] = useState(false);
+  const [deletingData, setDeletingData] = useState(false);
+
+  function askWarning(title: string, message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+        { text: "Continue", style: "destructive", onPress: () => resolve(true) },
+      ]);
+    });
+  }
+
+  async function confirmThreeWarnings(warnings: Array<{ title: string; message: string }>) {
+    for (const warning of warnings) {
+      const ok = await askWarning(warning.title, warning.message);
+      if (!ok) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   async function addDemoData() {
     if (!user) {
@@ -29,6 +51,80 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleDeleteAllLogs() {
+    if (!user) {
+      return;
+    }
+
+    const confirmed = await confirmThreeWarnings([
+      {
+        title: "Warning 1 of 3",
+        message: "This will permanently delete all your AI logs.",
+      },
+      {
+        title: "Warning 2 of 3",
+        message: "Deleted logs cannot be recovered.",
+      },
+      {
+        title: "Warning 3 of 3",
+        message: "Are you absolutely sure you want to permanently delete all AI logs?",
+      },
+    ]);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingLogs(true);
+      const result = await deleteAllMyLogs();
+      Alert.alert("Logs deleted", `Done. Removed ${result.deleted} log record(s).`);
+    } catch (error) {
+      Alert.alert("Could not delete logs", friendlyError(error, "Please try again."));
+    } finally {
+      setDeletingLogs(false);
+    }
+  }
+
+  async function handleDeleteDataExceptAccount() {
+    if (!user) {
+      return;
+    }
+
+    const confirmed = await confirmThreeWarnings([
+      {
+        title: "Warning 1 of 3",
+        message: "This will permanently delete your app data, but keep your account.",
+      },
+      {
+        title: "Warning 2 of 3",
+        message: "This removes your reports, matches, chats, photos, and AI logs.",
+      },
+      {
+        title: "Warning 3 of 3",
+        message: "Final check: continue deleting all your data except your account?",
+      },
+    ]);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingData(true);
+      const result = await deleteMyDataExceptAccount();
+      const details = result.deleted;
+      Alert.alert(
+        "Data deleted",
+        `Done.\nReports: ${details.reports}\nMatches: ${details.matches}\nChats: ${details.chats}\nAI logs: ${details.logs}\nPhotos: ${details.photos}`,
+      );
+    } catch (error) {
+      Alert.alert("Could not delete data", friendlyError(error, "Please try again."));
+    } finally {
+      setDeletingData(false);
+    }
+  }
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -42,6 +138,12 @@ export default function ProfileScreen() {
       </View>
       {profile?.role === "admin" ? <Button title="Open admin dashboard" variant="secondary" onPress={() => router.push("/admin")} /> : null}
       <Button title="Seed 20 lost reports" variant="ghost" onPress={addDemoData} loading={seeding} />
+      <View style={styles.dangerPanel}>
+        <Text style={styles.dangerTitle}>Danger zone</Text>
+        <Text style={styles.dangerBody}>These actions are permanent and cannot be undone.</Text>
+        <Button title="Delete all logs permanently" variant="danger" onPress={handleDeleteAllLogs} loading={deletingLogs} disabled={deletingData} />
+        <Button title="Delete data (all except account)" variant="danger" onPress={handleDeleteDataExceptAccount} loading={deletingData} disabled={deletingLogs} />
+      </View>
       <Button title="Sign out" variant="danger" onPress={signOutUser} />
     </Screen>
   );
@@ -75,5 +177,22 @@ const styles = StyleSheet.create({
   },
   meta: {
     color: colors.muted,
+  },
+  dangerPanel: {
+    backgroundColor: "#fff4f4",
+    borderColor: "#f2b5b5",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 14,
+    gap: 10,
+  },
+  dangerTitle: {
+    color: colors.danger,
+    fontWeight: "900",
+    fontSize: 16,
+  },
+  dangerBody: {
+    color: colors.ink,
+    lineHeight: 20,
   },
 });
