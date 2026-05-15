@@ -36,8 +36,8 @@ export function subscribeToUserMatches(uid: string, onData: SnapshotHandler<Matc
   };
 }
 
-async function startChatForMatchViaFirestore(matchId: string): Promise<string> {
-  const uid = auth.currentUser?.uid;
+async function startChatForMatchViaFirestore(matchId: string, uidFromCaller?: string): Promise<string> {
+  const uid = uidFromCaller ?? auth.currentUser?.uid;
   if (!uid) {
     throw new Error("Sign in first.");
   }
@@ -116,18 +116,18 @@ function shouldFallbackToFirestore(error: unknown): boolean {
   ].some((token) => message.includes(token));
 }
 
-export async function startChatForMatch(matchId: string): Promise<string> {
+export async function startChatForMatch(matchId: string, uid?: string): Promise<string> {
   // Hosted web deployments often hit extension/CORS blockers on callable endpoints.
   // Use Firestore-first on web to avoid cross-origin callable failures.
   if (Platform.OS === "web") {
-    return startChatForMatchViaFirestore(matchId);
+    return startChatForMatchViaFirestore(matchId, uid);
   }
 
   try {
     return await startChatForMatchViaCallable(matchId);
   } catch (error) {
     if (shouldFallbackToFirestore(error)) {
-      return startChatForMatchViaFirestore(matchId);
+      return startChatForMatchViaFirestore(matchId, uid);
     }
     throw error;
   }

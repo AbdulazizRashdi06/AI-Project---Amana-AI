@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { MessageCircle, Sparkles, XCircle } from "lucide-react-native";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { MatchCard } from "@/components/MatchCard";
@@ -13,13 +14,21 @@ import { colors } from "@/theme/colors";
 export default function MatchesScreen() {
   const { user } = useAuth();
   const { matches, loading, error } = useUserMatches(user?.uid);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   async function openChat(matchId: string) {
+    setActionMessage(null);
     try {
-      const chatId = await startChatForMatch(matchId);
-      router.push({ pathname: "/chat/[id]", params: { id: chatId } });
+      const chatId = await startChatForMatch(matchId, user?.uid);
+      router.push(`/chat/${chatId}`);
     } catch (nextError) {
-      Alert.alert("Could not start chat", nextError instanceof Error ? nextError.message : "Please try again.");
+      const message = nextError instanceof Error ? nextError.message : "Please try again.";
+      setActionMessage(`Could not start chat: ${message}`);
+      if (Platform.OS === "web") {
+        window.alert(`Could not start chat: ${message}`);
+      } else {
+        Alert.alert("Could not start chat", message);
+      }
     }
   }
 
@@ -48,6 +57,7 @@ export default function MatchesScreen() {
         </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {actionMessage ? <Text style={styles.error}>{actionMessage}</Text> : null}
       {!loading && matches.length === 0 ? (
         <EmptyState title="No matches yet" body="New reports trigger AI matching automatically. Strong and possible matches will appear here." />
       ) : null}
@@ -127,6 +137,12 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderColor: "#f8b4ae",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    lineHeight: 20,
   },
   matchWrap: {
     gap: 8,
