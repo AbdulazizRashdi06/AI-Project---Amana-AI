@@ -8,6 +8,165 @@ import { formatDateTime } from "@/lib/dates";
 import { colors } from "@/theme/colors";
 import type { AiLogRecord } from "@/types/domain";
 
+type StepNarrative = {
+  title: string;
+  message: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function asBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function percent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function describeStep(log: AiLogRecord): StepNarrative {
+  const input = asRecord(log.input);
+  const output = asRecord(log.output);
+
+  switch (log.step) {
+    case "process_started": {
+      const reportType = asString(input?.reportType);
+      return {
+        title: "Matching Started",
+        message: reportType === "lost" || reportType === "found"
+          ? `We started checking this ${reportType} report against possible matches.`
+          : "We started checking this report against possible matches.",
+      };
+    }
+    case "process_skipped":
+      return {
+        title: "Run Skipped",
+        message: "No new AI run was needed right now because this report did not require reprocessing.",
+      };
+    case "normalize_input":
+      return {
+        title: "Details Prepared",
+        message: "We cleaned and organized the report text so matching can be more accurate.",
+      };
+    case "embedding_request":
+      return {
+        title: "Understanding Item Details",
+        message: "AI is converting the report into a meaning-based representation for comparison.",
+      };
+    case "embedding_response": {
+      const localFallback = asRecord(output)?.provider === "local";
+      return {
+        title: "Item Understanding Ready",
+        message: localFallback
+          ? "The cloud AI service was unavailable, so a local fallback model was used for this step."
+          : "The item representation is ready and can now be compared with other reports.",
+      };
+    }
+    case "candidate_search": {
+      const count = asNumber(asRecord(output)?.count);
+      return {
+        title: "Possible Matches Collected",
+        message: count === null
+          ? "We collected opposite-type reports that could be related."
+          : `We found ${count} opposite-type reports to review as possible matches.`,
+      };
+    }
+    case "candidate_embedding_backfill":
+      return {
+        title: "Older Report Prepared",
+        message: "One candidate report needed background preparation before it could be compared fairly.",
+      };
+    case "candidate_score": {
+      const scoredCount = Array.isArray(log.output) ? log.output.length : null;
+      return {
+        title: "Candidates Ranked",
+        message: scoredCount === null
+          ? "We ranked candidate reports by similarity."
+          : `${scoredCount} candidate report${scoredCount === 1 ? "" : "s"} passed initial scoring and moved forward.`,
+      };
+    }
+    case "rerank_request":
+      return {
+        title: "Deep Pair Review",
+        message: "AI performed a deeper comparison on one possible lost/found pair.",
+      };
+    case "rerank_response": {
+      const result = asRecord(asRecord(output)?.result);
+      const likely = asBoolean(result?.isLikelyMatch);
+      const finalScore = asNumber(result?.finalScore);
+      if (likely === true && finalScore !== null) {
+        return {
+          title: "Deep Review Result",
+          message: `This pair looked promising with a confidence score of ${percent(finalScore)}.`,
+        };
+      }
+      if (likely === false && finalScore !== null) {
+        return {
+          title: "Deep Review Result",
+          message: `This pair looked weak after deep review (${percent(finalScore)} confidence).`,
+        };
+      }
+      return {
+        title: "Deep Review Result",
+        message: "AI returned its detailed decision for this candidate pair.",
+      };
+    }
+    case "match_created": {
+      const finalScore = asNumber(asRecord(output)?.finalScore);
+      return {
+        title: "Match Suggested",
+        message: finalScore === null
+          ? "A likely match was created and shown to users."
+          : `A likely match was created and suggested to users (${percent(finalScore)} confidence).`,
+      };
+    }
+    case "match_skipped": {
+      const reason = asString(asRecord(output)?.reason);
+      return {
+        title: "Candidate Skipped",
+        message: reason
+          ? `This candidate was skipped: ${reason}`
+          : "This candidate was skipped because it did not meet the match threshold.",
+      };
+    }
+    case "process_complete": {
+      const candidateCount = asNumber(asRecord(output)?.candidateCount);
+      const scoredCount = asNumber(asRecord(output)?.scoredCount);
+      if (candidateCount !== null && scoredCount !== null) {
+        return {
+          title: "Run Complete",
+          message: `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`,
+        };
+      }
+      return {
+        title: "Run Complete",
+        message: "Matching finished for this report.",
+      };
+    }
+    case "process_error":
+      return {
+        title: "Run Failed",
+        message: log.error
+          ? `Matching failed for this run: ${log.error}`
+          : "Matching failed for this run due to an unexpected error.",
+      };
+    default:
+      return {
+        title: "AI Update",
+        message: "A matching activity was recorded for this report.",
+      };
+  }
+}
+
 function stringify(value: unknown): string {
   return JSON.stringify(
     value,
@@ -36,9 +195,9 @@ export default function AiLogsScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.kicker}>AI Debug Console</Text>
-        <Text style={styles.title}>Matching logs</Text>
-        <Text style={styles.body}>Every backend matching step is written here: normalized input, embedding request/response, candidates, rerank request/response, skipped matches, created matches, and errors.</Text>
+        <Text style={styles.kicker}>AI Activity Feed</Text>
+        <Text style={styles.title}>Report Matching Story</Text>
+        <Text style={styles.body}>This page explains each AI matching action in plain language for every lost and found report.</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!loading && logs.length === 0 ? (
@@ -49,12 +208,14 @@ export default function AiLogsScreen() {
           <Text style={styles.reportTitle}>Report #{reportId.slice(0, 8)}</Text>
           {reportLogs.map((log) => {
             const expanded = expandedId === log.id;
+            const narrative = describeStep(log);
             return (
               <Pressable key={log.id} onPress={() => setExpandedId(expanded ? null : log.id)} style={styles.logCard}>
                 <View style={styles.logHeader}>
-                  <Text style={styles.step}>{log.step.replaceAll("_", " ")}</Text>
+                  <Text style={styles.step}>{narrative.title}</Text>
                   <Text style={styles.time}>{formatDateTime(log.createdAt)}</Text>
                 </View>
+                <Text style={styles.storyText}>{narrative.message}</Text>
                 <View style={styles.metaRow}>
                   {log.model ? <Text style={styles.meta}>Model: {log.model}</Text> : null}
                   {log.matchId ? <Text style={styles.meta}>Match: {log.matchId.slice(0, 10)}</Text> : null}
@@ -73,7 +234,7 @@ export default function AiLogsScreen() {
                     </View>
                   </View>
                 ) : (
-                  <Text style={styles.expandHint}>Tap to view input and output</Text>
+                  <Text style={styles.expandHint}>Tap for technical details</Text>
                 )}
               </Pressable>
             );
@@ -152,6 +313,10 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.danger,
+  },
+  storyText: {
+    color: colors.ink,
+    lineHeight: 21,
   },
   expandHint: {
     color: colors.muted,
