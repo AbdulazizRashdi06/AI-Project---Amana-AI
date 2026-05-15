@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check, CheckCircle, Plus, SearchX, X } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
 import { TextField } from "@/components/TextField";
@@ -13,8 +13,7 @@ import { colors } from "@/theme/colors";
 import type { ReportType } from "@/types/domain";
 
 export default function ReportScreen() {
-  const { width } = useWindowDimensions();
-  const compactDesktop = Platform.OS === "web" && width >= 1200;
+  const compactDesktop = true;
   const { user } = useAuth();
   const [type, setType] = useState<ReportType>("lost");
   const [title, setTitle] = useState("");
