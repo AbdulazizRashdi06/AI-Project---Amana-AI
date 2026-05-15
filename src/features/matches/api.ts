@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { Platform } from "react-native";
 import { auth, db, functions } from "@/firebase/config";
 import type { MatchRecord } from "@/types/domain";
 
@@ -116,6 +117,12 @@ function shouldFallbackToFirestore(error: unknown): boolean {
 }
 
 export async function startChatForMatch(matchId: string): Promise<string> {
+  // Hosted web deployments often hit extension/CORS blockers on callable endpoints.
+  // Use Firestore-first on web to avoid cross-origin callable failures.
+  if (Platform.OS === "web") {
+    return startChatForMatchViaFirestore(matchId);
+  }
+
   try {
     return await startChatForMatchViaCallable(matchId);
   } catch (error) {
