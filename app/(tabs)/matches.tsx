@@ -17,7 +17,7 @@ export default function MatchesScreen() {
   async function openChat(matchId: string) {
     try {
       const chatId = await startChatForMatch(matchId);
-      router.push(`/chat/${chatId}`);
+      router.push({ pathname: "/chat/[id]", params: { id: chatId } });
     } catch (nextError) {
       Alert.alert("Could not start chat", nextError instanceof Error ? nextError.message : "Please try again.");
     }

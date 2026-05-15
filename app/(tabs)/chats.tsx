@@ -20,7 +20,7 @@ export default function ChatsScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {chats.length === 0 ? <EmptyState title="No chats yet" body="Start a chat from a suggested match when you are ready to compare details." /> : null}
       {chats.map((chat) => (
-        <Pressable key={chat.id} onPress={() => router.push(`/chat/${chat.id}`)} style={styles.chatCard}>
+        <Pressable key={chat.id} onPress={() => router.push({ pathname: "/chat/[id]", params: { id: chat.id } })} style={styles.chatCard}>
           <Text style={styles.chatTitle}>Match chat #{chat.matchId.slice(0, 8)}</Text>
           <Text style={styles.meta}>{chat.status} - {formatDateTime(chat.updatedAt)}</Text>
           <Text style={styles.meta}>Lost #{chat.lostReportId.slice(0, 6)} - Found #{chat.foundReportId.slice(0, 6)}</Text>
