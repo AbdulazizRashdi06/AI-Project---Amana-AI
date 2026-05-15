@@ -1,7 +1,7 @@
 import { Send } from "lucide-react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/features/auth/AuthContext";
 import { sendChatMessage } from "@/features/chats/api";
@@ -34,6 +34,11 @@ export default function ChatDetailScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+      </View>
       <FlatList
         contentContainerStyle={styles.list}
         data={messages}
@@ -72,6 +77,24 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
     gap: 10,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    minHeight: 38,
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  backText: {
+    color: colors.ink,
+    fontWeight: "700",
   },
   safety: {
     backgroundColor: colors.amberSoft,
