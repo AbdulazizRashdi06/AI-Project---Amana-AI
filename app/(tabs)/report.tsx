@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check, CheckCircle, Plus, SearchX, X } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
 import { TextField } from "@/components/TextField";
@@ -13,6 +13,8 @@ import { colors } from "@/theme/colors";
 import type { ReportType } from "@/types/domain";
 
 export default function ReportScreen() {
+  const { width } = useWindowDimensions();
+  const compactDesktop = Platform.OS === "web" && width >= 1200;
   const { user } = useAuth();
   const [type, setType] = useState<ReportType>("lost");
   const [title, setTitle] = useState("");
@@ -75,20 +77,20 @@ export default function ReportScreen() {
   }
 
   return (
-    <Screen>
-      <View style={styles.topBar}>
+    <Screen scroll={!compactDesktop}>
+      <View style={[styles.topBar, compactDesktop && styles.topBarCompact]}>
         <Text style={styles.brand}>GUtech Finder</Text>
         <Text style={styles.topMeta}>AI Amana</Text>
       </View>
-      <View style={styles.header}>
+      <View style={[styles.header, compactDesktop && styles.headerCompact]}>
         <Text style={styles.kicker}>Dashboard</Text>
-        <Text style={styles.title}>Report Center</Text>
-        <Text style={styles.body}>File a secure lost or found report. AI Amana will compare item details, location, date, and photos.</Text>
+        <Text style={[styles.title, compactDesktop && styles.titleCompact]}>Report Center</Text>
+        <Text style={[styles.body, compactDesktop && styles.bodyCompact]}>File a secure lost or found report. AI Amana will compare item details, location, date, and photos.</Text>
       </View>
-      <View style={styles.actionGrid}>
+      <View style={[styles.actionGrid, compactDesktop && styles.actionGridCompact]}>
         <Pressable
           onPress={() => setType("lost")}
-          style={[styles.actionCard, type === "lost" ? styles.selectedLostCard : styles.unselectedLostCard]}
+          style={[styles.actionCard, compactDesktop && styles.actionCardCompact, type === "lost" ? styles.selectedLostCard : styles.unselectedLostCard]}
         >
           {type === "lost" ? (
             <View style={[styles.selectedBadge, styles.selectedBadgeLost]}>
@@ -106,7 +108,7 @@ export default function ReportScreen() {
         </Pressable>
         <Pressable
           onPress={() => setType("found")}
-          style={[styles.actionCard, type === "found" ? styles.selectedFoundCard : styles.unselectedFoundCard]}
+          style={[styles.actionCard, compactDesktop && styles.actionCardCompact, type === "found" ? styles.selectedFoundCard : styles.unselectedFoundCard]}
         >
           {type === "found" ? (
             <View style={[styles.selectedBadge, styles.selectedBadgeFound]}>
@@ -123,8 +125,8 @@ export default function ReportScreen() {
           </View>
         </Pressable>
       </View>
-      <View style={styles.formGrid}>
-        <View style={styles.formCard}>
+      <View style={[styles.formGrid, compactDesktop && styles.formGridCompact]}>
+        <View style={[styles.formCard, compactDesktop && styles.formCardCompact]}>
           <Text style={styles.sectionLabel}>Item Details</Text>
           <TextField label="Item title" value={title} onChangeText={setTitle} placeholder="Blue Dell XPS 15 laptop" />
           <TextField label={type === "lost" ? "Last seen location" : "Found location"} value={locationText} onChangeText={setLocationText} placeholder="Main Library, second floor" />
@@ -133,12 +135,13 @@ export default function ReportScreen() {
             value={description}
             onChangeText={setDescription}
             multiline
+            numberOfLines={compactDesktop ? 3 : 5}
             placeholder="Describe brand, color, contents, unique marks, and any useful context..."
           />
-          <View style={styles.mediaCard}>
+          <View style={[styles.mediaCard, compactDesktop && styles.mediaCardCompact]}>
             <Text style={styles.sectionLabel}>Visual Evidence</Text>
-            <Pressable accessibilityRole="button" style={styles.dropzone} onPress={addPhoto}>
-              <Camera color={colors.outline} size={34} />
+            <Pressable accessibilityRole="button" style={[styles.dropzone, compactDesktop && styles.dropzoneCompact]} onPress={addPhoto}>
+              <Camera color={colors.outline} size={compactDesktop ? 22 : 34} />
               <Text style={styles.dropzoneText}>Click to upload item photos</Text>
               <Text style={styles.dropzoneSubtext}>Up to {maxPhotosPerReport} images</Text>
             </Pressable>
@@ -164,7 +167,7 @@ export default function ReportScreen() {
             icon={<Plus color={type === "lost" ? "#fff" : colors.secondary} size={20} />}
           />
         </View>
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, compactDesktop && styles.infoCardCompact]}>
           <Text style={styles.infoText}>Reports are cross-referenced against opposite item reports. Mention unique marks, contents, brand, or scratches.</Text>
         </View>
       </View>
@@ -185,6 +188,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  topBarCompact: {
+    minHeight: 52,
+    marginTop: -18,
+  },
   brand: {
     color: colors.primary,
     fontSize: 22,
@@ -200,6 +207,9 @@ const styles = StyleSheet.create({
   header: {
     gap: 8,
   },
+  headerCompact: {
+    gap: 4,
+  },
   kicker: {
     color: colors.primary,
     textTransform: "uppercase",
@@ -213,16 +223,27 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 40,
   },
+  titleCompact: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
   body: {
     color: colors.muted,
     fontSize: 16,
     lineHeight: 24,
     maxWidth: 720,
   },
+  bodyCompact: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   actionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16,
+  },
+  actionGridCompact: {
+    gap: 12,
   },
   actionCard: {
     flexGrow: 1,
@@ -233,6 +254,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderWidth: 2,
     borderColor: "transparent",
+  },
+  actionCardCompact: {
+    minHeight: 118,
+    padding: 14,
   },
   selectedLostCard: {
     backgroundColor: colors.primary,
@@ -351,6 +376,10 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: "flex-start",
   },
+  formGridCompact: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
   formCard: {
     flexGrow: 2,
     width: "100%",
@@ -361,6 +390,11 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 20,
   },
+  formCardCompact: {
+    flex: 2,
+    padding: 14,
+    gap: 12,
+  },
   mediaCard: {
     backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
@@ -368,6 +402,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     gap: 16,
+  },
+  mediaCardCompact: {
+    padding: 12,
+    gap: 10,
   },
   sectionLabel: {
     color: colors.primary,
@@ -388,6 +426,10 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 8,
   },
+  dropzoneCompact: {
+    minHeight: 92,
+    padding: 12,
+  },
   dropzoneText: {
     color: colors.muted,
     fontWeight: "800",
@@ -404,6 +446,10 @@ const styles = StyleSheet.create({
     borderColor: colors.surfaceHigh,
     borderRadius: 12,
     padding: 18,
+  },
+  infoCardCompact: {
+    flex: 1,
+    padding: 14,
   },
   infoText: {
     color: colors.muted,
