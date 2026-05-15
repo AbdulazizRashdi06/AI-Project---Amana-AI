@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { appUpdateNumber } from "@/lib/build";
 import { colors } from "@/theme/colors";
 
 type ScreenProps = {
@@ -12,7 +13,10 @@ export function Screen({ children, scroll = true }: ScreenProps) {
   if (!scroll) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.content}>{children}</View>
+        <View style={styles.content}>
+          <Text style={styles.updateTag}>Update {appUpdateNumber}</Text>
+          {children}
+        </View>
       </SafeAreaView>
     );
   }
@@ -20,7 +24,10 @@ export function Screen({ children, scroll = true }: ScreenProps) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.container}>{children}</View>
+        <View style={styles.container}>
+          <Text style={styles.updateTag}>Update {appUpdateNumber}</Text>
+          {children}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -44,5 +51,11 @@ const styles = StyleSheet.create({
     maxWidth: 1280,
     alignSelf: "center",
     gap: 24,
+  },
+  updateTag: {
+    alignSelf: "flex-end",
+    color: colors.outline,
+    fontSize: 11,
+    fontWeight: "700",
   },
 });
