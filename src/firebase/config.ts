@@ -31,7 +31,17 @@ export function assertFirebaseConfigured() {
   }
 }
 
-export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const safeFirebaseConfig = {
+  apiKey: firebaseConfig.apiKey ?? "missing-api-key",
+  authDomain: firebaseConfig.authDomain ?? "missing-auth-domain.firebaseapp.com",
+  projectId: firebaseConfig.projectId ?? "missing-project-id",
+  storageBucket: firebaseConfig.storageBucket ?? "missing-storage-bucket.appspot.com",
+  messagingSenderId: firebaseConfig.messagingSenderId ?? "000000000000",
+  appId: firebaseConfig.appId ?? "1:000000000000:web:missing-app-id",
+  measurementId: firebaseConfig.measurementId,
+};
+
+export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(safeFirebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
 export const storage = getStorage(firebaseApp);

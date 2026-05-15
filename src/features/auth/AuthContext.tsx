@@ -60,14 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
-      setUser(nextUser);
-      try {
-        setProfile(await loadUserProfile(nextUser));
-      } finally {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (nextUser) => {
+        setUser(nextUser);
+        try {
+          setProfile(await loadUserProfile(nextUser));
+        } finally {
+          setLoading(false);
+        }
+      },
+      () => {
+        setUser(null);
+        setProfile(null);
         setLoading(false);
-      }
-    });
+      },
+    );
 
     return unsubscribe;
   }, []);
