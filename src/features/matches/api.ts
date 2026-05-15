@@ -59,19 +59,19 @@ async function startChatForMatchViaFirestore(matchId: string, uidFromCaller?: st
   }
 
   const chatRef = doc(db, "chats", matchId);
-  const chatSnap = await getDoc(chatRef);
-  if (!chatSnap.exists()) {
-    await setDoc(chatRef, {
+  await setDoc(
+    chatRef,
+    {
       id: matchId,
       matchId,
       participantUids: [match.lostOwnerUid, match.foundOwnerUid],
       lostReportId: match.lostReportId,
       foundReportId: match.foundReportId,
       status: "active",
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
-  }
+    },
+    { merge: true },
+  );
 
   try {
     await updateDoc(matchRef, { status: "chat_started", updatedAt: serverTimestamp() });
