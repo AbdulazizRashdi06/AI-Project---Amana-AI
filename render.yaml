@@ -2,7 +2,6 @@ services:
   - type: web
     name: ai-amana-web
     runtime: static
-    plan: free
     buildCommand: npm ci && npm run render:build
     staticPublishPath: dist
     routes:
@@ -24,4 +23,3 @@ services:
         sync: false
       - key: EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
         sync: false
-

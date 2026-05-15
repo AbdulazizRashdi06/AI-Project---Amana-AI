@@ -1,1 +1,1 @@
-export const appUpdateNumber = "2026.05.15.12";
+export const appUpdateNumber = "2026.05.15.13";
