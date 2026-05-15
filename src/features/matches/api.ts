@@ -3,6 +3,7 @@ import { httpsCallable } from "firebase/functions";
 import { Platform } from "react-native";
 import { auth, db, functions } from "@/firebase/config";
 import type { MatchRecord } from "@/types/domain";
+import type { ItemReport } from "@/types/domain";
 
 type SnapshotHandler<T> = (items: T[]) => void;
 
@@ -34,6 +35,43 @@ export function subscribeToUserMatches(uid: string, onData: SnapshotHandler<Matc
     unsubLost();
     unsubFound();
   };
+}
+
+export type MatchDetailRecord = {
+  match: MatchRecord;
+  lostReport: ItemReport | null;
+  foundReport: ItemReport | null;
+};
+
+export function subscribeToMatchDetail(
+  matchId: string,
+  onData: (item: MatchDetailRecord | null) => void,
+  onError: (error: Error) => void,
+) {
+  const matchRef = doc(db, "matches", matchId);
+
+  return onSnapshot(
+    matchRef,
+    async (snapshot) => {
+      if (!snapshot.exists()) {
+        onData(null);
+        return;
+      }
+
+      const match = { id: snapshot.id, ...snapshot.data() } as MatchRecord;
+      const [lostReportSnap, foundReportSnap] = await Promise.all([
+        getDoc(doc(db, "reports", match.lostReportId)),
+        getDoc(doc(db, "reports", match.foundReportId)),
+      ]);
+
+      onData({
+        match,
+        lostReport: lostReportSnap.exists() ? ({ id: lostReportSnap.id, ...lostReportSnap.data() } as ItemReport) : null,
+        foundReport: foundReportSnap.exists() ? ({ id: foundReportSnap.id, ...foundReportSnap.data() } as ItemReport) : null,
+      });
+    },
+    onError,
+  );
 }
 
 async function startChatForMatchViaFirestore(matchId: string, uidFromCaller?: string): Promise<string> {

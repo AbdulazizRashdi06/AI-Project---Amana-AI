@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { subscribeToUserMatches } from "@/features/matches/api";
+import { subscribeToMatchDetail, subscribeToUserMatches, type MatchDetailRecord } from "@/features/matches/api";
 import type { MatchRecord } from "@/types/domain";
 
 export function useUserMatches(uid?: string) {
@@ -29,4 +29,33 @@ export function useUserMatches(uid?: string) {
   }, [uid]);
 
   return { matches, loading, error };
+}
+
+export function useMatchDetail(matchId?: string) {
+  const [detail, setDetail] = useState<MatchDetailRecord | null>(null);
+  const [loading, setLoading] = useState(Boolean(matchId));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!matchId) {
+      setDetail(null);
+      setLoading(false);
+      return undefined;
+    }
+
+    setLoading(true);
+    return subscribeToMatchDetail(
+      matchId,
+      (item) => {
+        setDetail(item);
+        setLoading(false);
+      },
+      (nextError) => {
+        setError(nextError.message);
+        setLoading(false);
+      },
+    );
+  }, [matchId]);
+
+  return { detail, loading, error };
 }
