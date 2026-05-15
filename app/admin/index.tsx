@@ -42,7 +42,7 @@ export default function AdminScreen() {
         <View key={report.id} style={styles.tableRow}>
           <View style={styles.rowText}>
             <Text style={styles.itemTitle}>{report.title}</Text>
-            <Text style={styles.meta}>{report.type} - {report.category} - {report.status} - {report.aiProcessingStatus}</Text>
+            <Text style={styles.meta}>{report.type} - {report.category ?? "No category"} - {report.status} - {report.aiProcessingStatus}</Text>
             <Text style={styles.meta}>{report.locationText}</Text>
           </View>
           <View style={styles.rowActions}>

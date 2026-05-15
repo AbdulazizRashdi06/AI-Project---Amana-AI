@@ -22,7 +22,7 @@ export type ItemReport = {
   ownerUid: string;
   title: string;
   description: string;
-  category: string;
+  category?: string | null;
   locationText: string;
   campusZone?: string | null;
   eventDate: Timestamp | null;
@@ -73,7 +73,7 @@ export type MatchRecord = {
 
 export type ReportSummary = {
   title: string;
-  category: string;
+  category?: string | null;
   locationText: string;
   photoUrls: string[];
   eventDate: Timestamp | null;
@@ -140,7 +140,7 @@ export type CreateReportInput = {
   type: ReportType;
   title: string;
   description: string;
-  category: string;
+  category?: string | null;
   locationText: string;
   campusZone?: string | null;
   eventDate?: Date | null;

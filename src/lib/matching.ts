@@ -21,7 +21,7 @@ export function normalizeReportText(
   return [
     `Type: ${report.type}`,
     `Title: ${report.title}`,
-    `Category: ${report.category}`,
+    `Category: ${report.category?.trim() || "Unknown"}`,
     `Description: ${report.description}`,
     `Location: ${report.locationText}`,
     `Campus zone: ${report.campusZone ?? "Unknown"}`,

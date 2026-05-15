@@ -55,7 +55,7 @@ function reportToText(label: string, report: ItemReport): string {
   return [
     `${label} report`,
     `Title: ${report.title}`,
-    `Category: ${report.category}`,
+    `Category: ${report.category?.trim() || "Unknown"}`,
     `Description: ${report.description}`,
     `Location: ${report.locationText}`,
     `Campus zone: ${report.campusZone ?? "Unknown"}`,
@@ -64,8 +64,10 @@ function reportToText(label: string, report: ItemReport): string {
 }
 
 function fallbackReason(lost: ItemReport, found: ItemReport, semanticScore: number): MatchAIResult {
+  const lostCategory = lost.category?.trim().toLowerCase();
+  const foundCategory = found.category?.trim().toLowerCase();
   const matchedFields = [
-    lost.category === found.category ? "category" : null,
+    lostCategory && foundCategory && lostCategory === foundCategory ? "category" : null,
     lost.locationText.toLowerCase().split(/\s+/).some((token) => found.locationText.toLowerCase().includes(token)) ? "location" : null,
   ].filter(Boolean) as string[];
 

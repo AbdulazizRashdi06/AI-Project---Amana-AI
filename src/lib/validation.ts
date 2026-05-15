@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defaultSettings, maxPhotosPerReport } from "@/lib/constants";
+import { maxPhotosPerReport } from "@/lib/constants";
 
 export const emailSchema = z
   .string()
@@ -16,10 +16,7 @@ export const reportSchema = z.object({
     .trim()
     .min(1, "Add a short description.")
     .max(1000),
-  category: z
-    .string()
-    .min(1, "Choose a category.")
-    .refine((category) => defaultSettings.categories.includes(category), "Choose a valid category."),
+  category: z.string().trim().min(1).nullable().optional(),
   locationText: z.string().trim().min(2, "Add a campus location.").max(120),
   campusZone: z.string().nullable().optional(),
   eventDate: z.date().nullable().optional(),

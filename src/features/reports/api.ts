@@ -54,7 +54,7 @@ export async function createReport(uid: string, input: CreateReportInput): Promi
     ownerUid: uid,
     title: values.title,
     description: values.description,
-    category: values.category,
+    category: values.category ?? null,
     locationText: values.locationText,
     campusZone: values.campusZone ?? null,
     eventDate: values.eventDate ? Timestamp.fromDate(values.eventDate) : null,

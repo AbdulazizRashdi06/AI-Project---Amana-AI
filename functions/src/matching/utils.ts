@@ -9,7 +9,7 @@ export function normalizeReportText(report: ItemReport): string {
   return [
     `Type: ${report.type}`,
     `Title: ${report.title}`,
-    `Category: ${report.category}`,
+    `Category: ${report.category?.trim() || "Unknown"}`,
     `Description: ${report.description}`,
     `Location: ${report.locationText}`,
     `Campus zone: ${report.campusZone ?? "Unknown"}`,
@@ -91,14 +91,19 @@ function overlapRatio(source: Set<string>, candidate: Set<string>): number {
 }
 
 export function categoryBoost(source: ItemReport, candidate: ItemReport): number {
-  return source.category === candidate.category ? 0.05 : -0.08;
+  const sourceCategory = source.category?.trim().toLowerCase();
+  const candidateCategory = candidate.category?.trim().toLowerCase();
+  if (!sourceCategory || !candidateCategory) {
+    return 0;
+  }
+  return sourceCategory === candidateCategory ? 0.05 : -0.02;
 }
 
 export function itemDetailBoost(source: ItemReport, candidate: ItemReport): number {
   const sourceTitle = tokensFor(source.title);
   const candidateTitle = tokensFor(candidate.title);
-  const sourceDetails = tokensFor(`${source.title} ${source.description} ${source.category}`);
-  const candidateDetails = tokensFor(`${candidate.title} ${candidate.description} ${candidate.category}`);
+  const sourceDetails = tokensFor(`${source.title} ${source.description} ${source.category ?? ""}`);
+  const candidateDetails = tokensFor(`${candidate.title} ${candidate.description} ${candidate.category ?? ""}`);
 
   const titleOverlap = overlapRatio(sourceTitle, candidateTitle);
   const detailOverlap = overlapRatio(sourceDetails, candidateDetails);

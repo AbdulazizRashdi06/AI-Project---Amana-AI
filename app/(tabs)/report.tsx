@@ -1,13 +1,13 @@
 import * as ImagePicker from "expo-image-picker";
 import { Camera, CheckCircle, Plus, SearchX, X } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
 import { TextField } from "@/components/TextField";
 import { useAuth } from "@/features/auth/AuthContext";
 import { createReport } from "@/features/reports/api";
-import { defaultSettings, maxPhotosPerReport } from "@/lib/constants";
+import { maxPhotosPerReport } from "@/lib/constants";
 import { friendlyError } from "@/lib/errors";
 import { colors } from "@/theme/colors";
 import type { ReportType } from "@/types/domain";
@@ -16,7 +16,6 @@ export default function ReportScreen() {
   const { user } = useAuth();
   const [type, setType] = useState<ReportType>("lost");
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState(defaultSettings.categories[0]);
   const [locationText, setLocationText] = useState("");
   const [description, setDescription] = useState("");
   const [photoUris, setPhotoUris] = useState<string[]>([]);
@@ -57,7 +56,6 @@ export default function ReportScreen() {
       const reportId = await createReport(user.uid, {
         type,
         title,
-        category,
         description,
         locationText,
         campusZone: locationText,
@@ -111,16 +109,6 @@ export default function ReportScreen() {
         <View style={styles.formCard}>
           <Text style={styles.sectionLabel}>Item Details</Text>
           <TextField label="Item title" value={title} onChangeText={setTitle} placeholder="Blue Dell XPS 15 laptop" />
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {defaultSettings.categories.map((item) => (
-                <Pressable key={item} onPress={() => setCategory(item)} style={[styles.chip, category === item && styles.chipSelected]}>
-                  <Text style={[styles.chipText, category === item && styles.chipTextSelected]}>{item}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
           <TextField label={type === "lost" ? "Last seen location" : "Found location"} value={locationText} onChangeText={setLocationText} placeholder="Main Library, second floor" />
           <TextField
             label="Detailed description"
@@ -330,39 +318,6 @@ const styles = StyleSheet.create({
   infoText: {
     color: colors.muted,
     lineHeight: 20,
-  },
-  fieldGroup: {
-    gap: 8,
-  },
-  label: {
-    color: colors.ink,
-    fontWeight: "800",
-  },
-  chips: {
-    flexDirection: "row",
-    gap: 8,
-    paddingRight: 8,
-  },
-  chip: {
-    borderColor: colors.border,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: "center",
-  },
-  chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipText: {
-    color: colors.ink,
-    fontWeight: "700",
-  },
-  chipTextSelected: {
-    color: "#fff",
   },
   photoGrid: {
     flexDirection: "row",

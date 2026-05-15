@@ -41,7 +41,7 @@ export const onReportCreatedOrUpdated = onDocumentWritten("reports/{reportId}", 
   await processReport(before, after);
 });
 
-export const startChatForMatch = onCall({ cors: true }, async (request) => {
+export const startChatForMatch = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
   const matchId = String(request.data?.matchId ?? "");
@@ -108,7 +108,7 @@ export const startChatForMatch = onCall({ cors: true }, async (request) => {
   return { chatId: chatRef.id };
 });
 
-export const dismissMatch = onCall({ cors: true }, async (request) => {
+export const dismissMatch = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
   const matchId = String(request.data?.matchId ?? "");
@@ -138,7 +138,7 @@ export const dismissMatch = onCall({ cors: true }, async (request) => {
   return { ok: true };
 });
 
-export const rerunMatchingForReport = onCall({ cors: true }, async (request) => {
+export const rerunMatchingForReport = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
   const reportId = String(request.data?.reportId ?? "");
@@ -168,7 +168,7 @@ export const rerunMatchingForReport = onCall({ cors: true }, async (request) => 
   return { ok: true };
 });
 
-export const markReportResolved = onCall({ cors: true }, async (request) => {
+export const markReportResolved = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
   const reportId = String(request.data?.reportId ?? "");
@@ -217,7 +217,7 @@ export const markReportResolved = onCall({ cors: true }, async (request) => {
   return { ok: true };
 });
 
-export const adminUpdateReportStatus = onCall({ cors: true }, async (request) => {
+export const adminUpdateReportStatus = onCall({ cors: true, invoker: "public" }, async (request) => {
   assertAuthed(request.auth?.uid);
   const uid = request.auth!.uid;
 

@@ -34,7 +34,7 @@ exports.onReportCreatedOrUpdated = (0, firestore_2.onDocumentWritten)("reports/{
     }
     await (0, processReport_1.processReport)(before, after);
 });
-exports.startChatForMatch = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.startChatForMatch = (0, https_1.onCall)({ cors: true, invoker: "public" }, async (request) => {
     assertAuthed(request.auth?.uid);
     const uid = request.auth.uid;
     const matchId = String(request.data?.matchId ?? "");
@@ -91,7 +91,7 @@ exports.startChatForMatch = (0, https_1.onCall)({ cors: true }, async (request) 
     await batch.commit();
     return { chatId: chatRef.id };
 });
-exports.dismissMatch = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.dismissMatch = (0, https_1.onCall)({ cors: true, invoker: "public" }, async (request) => {
     assertAuthed(request.auth?.uid);
     const uid = request.auth.uid;
     const matchId = String(request.data?.matchId ?? "");
@@ -114,7 +114,7 @@ exports.dismissMatch = (0, https_1.onCall)({ cors: true }, async (request) => {
     });
     return { ok: true };
 });
-exports.rerunMatchingForReport = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.rerunMatchingForReport = (0, https_1.onCall)({ cors: true, invoker: "public" }, async (request) => {
     assertAuthed(request.auth?.uid);
     const uid = request.auth.uid;
     const reportId = String(request.data?.reportId ?? "");
@@ -136,7 +136,7 @@ exports.rerunMatchingForReport = (0, https_1.onCall)({ cors: true }, async (requ
     await (0, processReport_1.processReport)(null, { ...reportData, aiProcessingStatus: "pending", aiProcessingError: null }, { force: true });
     return { ok: true };
 });
-exports.markReportResolved = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.markReportResolved = (0, https_1.onCall)({ cors: true, invoker: "public" }, async (request) => {
     assertAuthed(request.auth?.uid);
     const uid = request.auth.uid;
     const reportId = String(request.data?.reportId ?? "");
@@ -172,7 +172,7 @@ exports.markReportResolved = (0, https_1.onCall)({ cors: true }, async (request)
     await batch.commit();
     return { ok: true };
 });
-exports.adminUpdateReportStatus = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.adminUpdateReportStatus = (0, https_1.onCall)({ cors: true, invoker: "public" }, async (request) => {
     assertAuthed(request.auth?.uid);
     const uid = request.auth.uid;
     if (!(await isAdmin(uid, request.auth?.token.admin === true))) {
