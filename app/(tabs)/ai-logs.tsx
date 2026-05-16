@@ -14,6 +14,22 @@ type StepNarrative = {
   message: string;
 };
 
+type CostRun = {
+  id: string;
+  reportId: string;
+  createdAt: AiLogRecord["createdAt"];
+  runCostUsd: number;
+};
+
+type CostSummary = {
+  runCount: number;
+  totalCostUsd: number;
+  averageCostUsd: number;
+  highCostThresholdUsd: number;
+  highCostRuns: CostRun[];
+  highestCostRun: CostRun | null;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
@@ -32,6 +48,17 @@ function asString(value: unknown): string | null {
 
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function runCostFromLog(log: AiLogRecord): number | null {
+  if (log.step !== "process_complete") {
+    return null;
+  }
+  return asNumber(asRecord(log.output)?.run_cost_usd);
+}
+
+function highCostThresholdFromAverage(averageCostUsd: number): number {
+  return averageCostUsd * 1.5;
 }
 
 function formatUsd(value: number): string {
@@ -149,18 +176,15 @@ function describeStep(log: AiLogRecord): StepNarrative {
     case "process_complete": {
       const candidateCount = asNumber(asRecord(output)?.candidateCount);
       const scoredCount = asNumber(asRecord(output)?.scoredCount);
-      const runCost = asNumber(asRecord(output)?.run_cost_usd);
       if (candidateCount !== null && scoredCount !== null) {
         return {
           title: "Run Complete",
-          message: runCost === null
-            ? `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`
-            : `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring, estimated cost ${formatUsd(runCost)}.`,
+          message: `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`,
         };
       }
       return {
         title: "Run Complete",
-        message: runCost === null ? "Matching finished for this report." : `Matching finished for this report, estimated cost ${formatUsd(runCost)}.`,
+        message: "Matching finished for this report.",
       };
     }
     case "process_error":
@@ -204,6 +228,44 @@ export default function AiLogsScreen() {
     }
     return Array.from(byReport.entries());
   }, [visibleLogs]);
+  const costSummary = useMemo<CostSummary | null>(() => {
+    const runs: CostRun[] = visibleLogs
+      .map((log) => {
+        const runCostUsd = runCostFromLog(log);
+        if (runCostUsd === null) {
+          return null;
+        }
+        return {
+          id: log.id,
+          reportId: log.reportId,
+          createdAt: log.createdAt,
+          runCostUsd,
+        };
+      })
+      .filter((item): item is CostRun => item !== null);
+
+    if (!runs.length) {
+      return null;
+    }
+
+    const totalCostUsd = runs.reduce((sum, run) => sum + run.runCostUsd, 0);
+    const averageCostUsd = totalCostUsd / runs.length;
+    const highCostThresholdUsd = highCostThresholdFromAverage(averageCostUsd);
+    const highCostRuns = runs.filter((run) => run.runCostUsd >= highCostThresholdUsd);
+    const highestCostRun = runs.reduce<CostRun | null>(
+      (currentHighest, run) => (!currentHighest || run.runCostUsd > currentHighest.runCostUsd ? run : currentHighest),
+      null,
+    );
+
+    return {
+      runCount: runs.length,
+      totalCostUsd,
+      averageCostUsd,
+      highCostThresholdUsd,
+      highCostRuns,
+      highestCostRun,
+    };
+  }, [visibleLogs]);
 
   return (
     <Screen>
@@ -216,6 +278,27 @@ export default function AiLogsScreen() {
           {cleared ? <Button title="Show logs" variant="secondary" onPress={() => setCleared(false)} /> : null}
         </View>
       </View>
+      {costSummary ? (
+        <View style={styles.costCard}>
+          <Text style={styles.costTitle}>Cost Analytics</Text>
+          <Text style={styles.costBody}>Average run cost is calculated from all completed runs with pricing data.</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta}>Runs: {costSummary.runCount}</Text>
+            <Text style={styles.meta}>Average: {formatUsd(costSummary.averageCostUsd)}</Text>
+            <Text style={styles.meta}>Total: {formatUsd(costSummary.totalCostUsd)}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta}>High-cost threshold: {formatUsd(costSummary.highCostThresholdUsd)}</Text>
+            <Text style={styles.meta}>High-cost runs: {costSummary.highCostRuns.length}</Text>
+          </View>
+          {costSummary.highestCostRun ? (
+            <Text style={styles.costAlert}>
+              Highest run: {formatUsd(costSummary.highestCostRun.runCostUsd)} on report #{costSummary.highestCostRun.reportId.slice(0, 8)} (
+              {formatDateTime(costSummary.highestCostRun.createdAt)})
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!loading && visibleLogs.length === 0 ? (
         <EmptyState title="No AI logs yet" body="Create or update a lost/found report after deploying the Functions update. The next matching run will appear here." />
@@ -226,7 +309,6 @@ export default function AiLogsScreen() {
           {reportLogs.map((log) => {
             const expanded = expandedId === log.id;
             const narrative = describeStep(log);
-            const runCost = asNumber(asRecord(log.output)?.run_cost_usd);
             return (
               <Pressable key={log.id} onPress={() => setExpandedId(expanded ? null : log.id)} style={styles.logCard}>
                 <View style={styles.logHeader}>
@@ -236,7 +318,6 @@ export default function AiLogsScreen() {
                 <Text style={styles.storyText}>{narrative.message}</Text>
                 <View style={styles.metaRow}>
                   {log.model ? <Text style={styles.meta}>Model: {log.model}</Text> : null}
-                  {runCost !== null ? <Text style={styles.meta}>Run cost: {formatUsd(runCost)}</Text> : null}
                   {log.matchId ? <Text style={styles.meta}>Match: {log.matchId.slice(0, 10)}</Text> : null}
                   {log.candidateReportId ? <Text style={styles.meta}>Candidate: {log.candidateReportId.slice(0, 10)}</Text> : null}
                 </View>
@@ -289,6 +370,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     flexWrap: "wrap",
+  },
+  costCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  costTitle: {
+    color: colors.primary,
+    fontWeight: "900",
+    fontSize: 18,
+  },
+  costBody: {
+    color: colors.muted,
+    lineHeight: 21,
+  },
+  costAlert: {
+    color: colors.amber,
+    fontWeight: "800",
   },
   reportGroup: {
     gap: 10,
