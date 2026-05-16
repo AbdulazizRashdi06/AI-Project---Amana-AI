@@ -19,9 +19,8 @@ export default function PresentationHubScreen() {
 
       <View style={styles.optionsCard}>
         <Text style={styles.sectionTitle}>Options</Text>
-        <Text style={styles.sectionBody}>Use these three options during your presentation flow.</Text>
+        <Text style={styles.sectionBody}>Use these options during your presentation flow.</Text>
         <View style={styles.actions}>
-          <Button title="Overview" variant="secondary" onPress={() => router.push("/presentation-overview")} />
           <Button title="Logs" variant="ghost" onPress={() => router.push("/logs")} />
           <Button title="Costs" variant="primary" onPress={() => router.push("/cost-table")} />
         </View>

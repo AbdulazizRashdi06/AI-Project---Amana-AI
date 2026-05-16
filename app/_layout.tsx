@@ -16,7 +16,6 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="admin/index" />
-            <Stack.Screen name="presentation-overview" options={{ headerShown: true, title: "Presentation Overview" }} />
             <Stack.Screen name="logs" options={{ headerShown: true, title: "Logs" }} />
             <Stack.Screen name="cost-table" options={{ headerShown: true, title: "Cost Table" }} />
             <Stack.Screen name="chat/[id]" options={{ headerShown: true, title: "Chat" }} />
