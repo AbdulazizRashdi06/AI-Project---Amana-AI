@@ -34,6 +34,13 @@ function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatUsd(value: number): string {
+  if (value >= 1) {
+    return `$${value.toFixed(4)}`;
+  }
+  return `$${value.toFixed(6)}`;
+}
+
 function describeStep(log: AiLogRecord): StepNarrative {
   const input = asRecord(log.input);
   const output = asRecord(log.output);
@@ -142,15 +149,18 @@ function describeStep(log: AiLogRecord): StepNarrative {
     case "process_complete": {
       const candidateCount = asNumber(asRecord(output)?.candidateCount);
       const scoredCount = asNumber(asRecord(output)?.scoredCount);
+      const runCost = asNumber(asRecord(output)?.run_cost_usd);
       if (candidateCount !== null && scoredCount !== null) {
         return {
           title: "Run Complete",
-          message: `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`,
+          message: runCost === null
+            ? `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`
+            : `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring, estimated cost ${formatUsd(runCost)}.`,
         };
       }
       return {
         title: "Run Complete",
-        message: "Matching finished for this report.",
+        message: runCost === null ? "Matching finished for this report." : `Matching finished for this report, estimated cost ${formatUsd(runCost)}.`,
       };
     }
     case "process_error":
@@ -216,6 +226,7 @@ export default function AiLogsScreen() {
           {reportLogs.map((log) => {
             const expanded = expandedId === log.id;
             const narrative = describeStep(log);
+            const runCost = asNumber(asRecord(log.output)?.run_cost_usd);
             return (
               <Pressable key={log.id} onPress={() => setExpandedId(expanded ? null : log.id)} style={styles.logCard}>
                 <View style={styles.logHeader}>
@@ -225,6 +236,7 @@ export default function AiLogsScreen() {
                 <Text style={styles.storyText}>{narrative.message}</Text>
                 <View style={styles.metaRow}>
                   {log.model ? <Text style={styles.meta}>Model: {log.model}</Text> : null}
+                  {runCost !== null ? <Text style={styles.meta}>Run cost: {formatUsd(runCost)}</Text> : null}
                   {log.matchId ? <Text style={styles.meta}>Match: {log.matchId.slice(0, 10)}</Text> : null}
                   {log.candidateReportId ? <Text style={styles.meta}>Candidate: {log.candidateReportId.slice(0, 10)}</Text> : null}
                 </View>

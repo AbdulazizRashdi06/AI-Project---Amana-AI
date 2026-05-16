@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.matchingVersion = exports.reasoningModel = exports.embeddingModel = void 0;
+exports.tokenPricingPer1M = exports.matchingVersion = exports.reasoningModel = exports.embeddingModel = void 0;
 exports.normalizeReportText = normalizeReportText;
 exports.cosineSimilarity = cosineSimilarity;
 exports.deterministicEmbedding = deterministicEmbedding;
@@ -13,6 +13,16 @@ exports.matchIdFor = matchIdFor;
 exports.embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 exports.reasoningModel = process.env.OPENAI_REASONING_MODEL || "gpt-5.4";
 exports.matchingVersion = "ai-amana-matcher-v1";
+function envNumberOr(name, fallback) {
+    const parsed = Number(process.env[name]);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+exports.tokenPricingPer1M = {
+    embeddingInput: envNumberOr("OPENAI_EMBEDDING_INPUT_PRICE_PER_1M", 0.02),
+    reasoningInput: envNumberOr("OPENAI_REASONING_INPUT_PRICE_PER_1M", 2.5),
+    reasoningCachedInput: envNumberOr("OPENAI_REASONING_CACHED_INPUT_PRICE_PER_1M", 0.25),
+    reasoningOutput: envNumberOr("OPENAI_REASONING_OUTPUT_PRICE_PER_1M", 15),
+};
 function normalizeReportText(report) {
     const eventDate = report.eventDate?.toDate?.().toISOString().slice(0, 10) ?? "Unknown";
     return [

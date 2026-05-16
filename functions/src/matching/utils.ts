@@ -4,6 +4,18 @@ export const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedd
 export const reasoningModel = process.env.OPENAI_REASONING_MODEL || "gpt-5.4";
 export const matchingVersion = "ai-amana-matcher-v1";
 
+function envNumberOr(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+export const tokenPricingPer1M = {
+  embeddingInput: envNumberOr("OPENAI_EMBEDDING_INPUT_PRICE_PER_1M", 0.02),
+  reasoningInput: envNumberOr("OPENAI_REASONING_INPUT_PRICE_PER_1M", 2.5),
+  reasoningCachedInput: envNumberOr("OPENAI_REASONING_CACHED_INPUT_PRICE_PER_1M", 0.25),
+  reasoningOutput: envNumberOr("OPENAI_REASONING_OUTPUT_PRICE_PER_1M", 15),
+};
+
 export function normalizeReportText(report: ItemReport): string {
   const eventDate = report.eventDate?.toDate?.().toISOString().slice(0, 10) ?? "Unknown";
   return [

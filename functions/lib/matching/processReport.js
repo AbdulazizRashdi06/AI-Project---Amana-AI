@@ -10,6 +10,97 @@ if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
 }
 const db = (0, firestore_1.getFirestore)();
+function emptyCostUsageTotals() {
+    return {
+        embeddingInputTokens: 0,
+        reasoningInputTokens: 0,
+        reasoningCachedInputTokens: 0,
+        reasoningOutputTokens: 0,
+        rerankCallCount: 0,
+        candidateEmbeddingBackfillCount: 0,
+    };
+}
+function asRecord(value) {
+    return value && typeof value === "object" ? value : null;
+}
+function asNumber(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function roundUsd(value) {
+    return Number(value.toFixed(8));
+}
+function collectEmbeddingUsage(costTotals, rawOutput) {
+    const usage = asRecord(asRecord(rawOutput)?.usage);
+    const promptTokens = asNumber(usage?.prompt_tokens) ?? asNumber(usage?.total_tokens) ?? 0;
+    if (promptTokens > 0) {
+        costTotals.embeddingInputTokens += promptTokens;
+    }
+}
+function collectReasoningUsage(costTotals, rawOutput) {
+    const usage = asRecord(asRecord(rawOutput)?.usage);
+    if (!usage) {
+        return;
+    }
+    const inputTokens = asNumber(usage.input_tokens) ?? 0;
+    const inputTokenDetails = asRecord(usage.input_tokens_details);
+    const cachedInputTokens = asNumber(inputTokenDetails?.cached_tokens) ?? 0;
+    const outputTokens = asNumber(usage.output_tokens) ?? 0;
+    costTotals.reasoningInputTokens += Math.max(0, inputTokens);
+    costTotals.reasoningCachedInputTokens += Math.max(0, cachedInputTokens);
+    costTotals.reasoningOutputTokens += Math.max(0, outputTokens);
+}
+function buildCostSummary(costTotals) {
+    const million = 1_000_000;
+    const billableReasoningInputTokens = Math.max(0, costTotals.reasoningInputTokens - costTotals.reasoningCachedInputTokens);
+    const embeddingCost = (costTotals.embeddingInputTokens / million) * utils_1.tokenPricingPer1M.embeddingInput;
+    const reasoningInputCost = (billableReasoningInputTokens / million) * utils_1.tokenPricingPer1M.reasoningInput;
+    const reasoningCachedInputCost = (costTotals.reasoningCachedInputTokens / million) * utils_1.tokenPricingPer1M.reasoningCachedInput;
+    const reasoningOutputCost = (costTotals.reasoningOutputTokens / million) * utils_1.tokenPricingPer1M.reasoningOutput;
+    const runCostUsd = roundUsd(embeddingCost + reasoningInputCost + reasoningCachedInputCost + reasoningOutputCost);
+    return {
+        run_cost_usd: runCostUsd,
+        usage_tokens: {
+            embedding_input_tokens: costTotals.embeddingInputTokens,
+            reasoning_input_tokens: costTotals.reasoningInputTokens,
+            reasoning_cached_input_tokens: costTotals.reasoningCachedInputTokens,
+            reasoning_output_tokens: costTotals.reasoningOutputTokens,
+            billable_reasoning_input_tokens: billableReasoningInputTokens,
+        },
+        price_per_1m_usd: {
+            embedding_input: utils_1.tokenPricingPer1M.embeddingInput,
+            reasoning_input: utils_1.tokenPricingPer1M.reasoningInput,
+            reasoning_cached_input: utils_1.tokenPricingPer1M.reasoningCachedInput,
+            reasoning_output: utils_1.tokenPricingPer1M.reasoningOutput,
+        },
+        cost_breakdown_usd: {
+            embedding_input: roundUsd(embeddingCost),
+            reasoning_input: roundUsd(reasoningInputCost),
+            reasoning_cached_input: roundUsd(reasoningCachedInputCost),
+            reasoning_output: roundUsd(reasoningOutputCost),
+        },
+    };
+}
+function buildComparisonCostProjection(runCostUsd, comparedCount) {
+    if (comparedCount <= 0 || runCostUsd <= 0) {
+        return {
+            compared_count_in_this_run: comparedCount,
+            estimated_cost_usd_if_6_reports: null,
+            estimated_cost_usd_if_10_reports: null,
+            estimated_cost_usd_if_100_reports: null,
+            estimated_cost_usd_if_1000_reports: null,
+            estimated_cost_usd_if_10000_reports: null,
+        };
+    }
+    const perComparisonCost = runCostUsd / comparedCount;
+    return {
+        compared_count_in_this_run: comparedCount,
+        estimated_cost_usd_if_6_reports: roundUsd(perComparisonCost * 6),
+        estimated_cost_usd_if_10_reports: roundUsd(perComparisonCost * 10),
+        estimated_cost_usd_if_100_reports: roundUsd(perComparisonCost * 100),
+        estimated_cost_usd_if_1000_reports: roundUsd(perComparisonCost * 1000),
+        estimated_cost_usd_if_10000_reports: roundUsd(perComparisonCost * 10000),
+    };
+}
 function shouldProcess(before, after) {
     if (after.status !== "open" || after.visibility === "private_hidden") {
         return false;
@@ -42,7 +133,7 @@ async function loadCandidates(source) {
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((candidate) => candidate.id !== source.id && candidate.visibility !== "private_hidden");
 }
-async function ensureCandidateEmbedding(candidate, sourceLogBase, expectedModel, expectedDimensions) {
+async function ensureCandidateEmbedding(candidate, sourceLogBase, expectedModel, expectedDimensions, costTotals) {
     const hasCurrentEmbedding = Array.isArray(candidate.embedding) &&
         candidate.embedding.length === expectedDimensions &&
         candidate.embeddingModel === expectedModel;
@@ -64,6 +155,8 @@ async function ensureCandidateEmbedding(candidate, sourceLogBase, expectedModel,
         model: utils_1.embeddingModel,
     });
     const { embedding, model, rawOutput } = await (0, openai_1.createEmbedding)(normalizedText);
+    collectEmbeddingUsage(costTotals, rawOutput);
+    costTotals.candidateEmbeddingBackfillCount += 1;
     await db.collection("reports").doc(candidate.id).update({
         normalizedText,
         embedding,
@@ -93,6 +186,7 @@ async function processReport(before, after, options = {}) {
         return;
     }
     const normalizedText = (0, utils_1.normalizeReportText)(after);
+    const costTotals = emptyCostUsageTotals();
     try {
         await (0, aiLogs_1.writeAiLog)(logBase, "process_started", {
             input: {
@@ -111,6 +205,7 @@ async function processReport(before, after, options = {}) {
             input: normalizedText,
         });
         const { embedding, model, rawOutput } = await (0, openai_1.createEmbedding)(normalizedText);
+        collectEmbeddingUsage(costTotals, rawOutput);
         await (0, aiLogs_1.writeAiLog)(logBase, "embedding_response", {
             model,
             output: rawOutput,
@@ -148,7 +243,7 @@ async function processReport(before, after, options = {}) {
         });
         const candidatesWithEmbeddings = [];
         for (const candidate of candidates) {
-            candidatesWithEmbeddings.push(await ensureCandidateEmbedding(candidate, logBase, model, embedding.length));
+            candidatesWithEmbeddings.push(await ensureCandidateEmbedding(candidate, logBase, model, embedding.length, costTotals));
         }
         const scored = candidatesWithEmbeddings
             .map((candidate) => {
@@ -196,6 +291,8 @@ async function processReport(before, after, options = {}) {
                 continue;
             }
             const rankDebug = await (0, openai_1.rankMatchWithOpenAI)(lost, found, semanticScore);
+            costTotals.rerankCallCount += 1;
+            collectReasoningUsage(costTotals, rankDebug.rawOutput);
             await (0, aiLogs_1.writeAiLog)(logBase, "rerank_request", {
                 matchId,
                 candidateReportId: candidate.id,
@@ -283,10 +380,16 @@ async function processReport(before, after, options = {}) {
                 },
             });
         }
+        const costSummary = buildCostSummary(costTotals);
+        const comparisonCostProjection = buildComparisonCostProjection(costSummary.run_cost_usd, scored.length);
         await (0, aiLogs_1.writeAiLog)(logBase, "process_complete", {
             output: {
                 candidateCount: candidates.length,
                 scoredCount: scored.length,
+                rerankCallCount: costTotals.rerankCallCount,
+                candidateEmbeddingBackfillCount: costTotals.candidateEmbeddingBackfillCount,
+                ...costSummary,
+                comparison_cost_projection: comparisonCostProjection,
             },
         });
     }
