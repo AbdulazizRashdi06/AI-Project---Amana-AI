@@ -76,14 +76,18 @@ export default function ReportScreen() {
 
   return (
     <Screen>
-      <View style={styles.topBar}>
-        <Text style={styles.brand}>GUtech Finder</Text>
-        <Text style={styles.topMeta}>AI Amana</Text>
-      </View>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Dashboard</Text>
-        <Text style={styles.title}>Report Center</Text>
-        <Text style={styles.body}>File a secure lost or found report. AI Amana will compare item details, location, date, and photos.</Text>
+      <View style={[styles.modeHeader, type === "lost" ? styles.modeHeaderLost : styles.modeHeaderFound]}>
+        <View style={styles.topBar}>
+          <Text style={[styles.brand, type === "lost" ? styles.headerTextLost : styles.headerTextFound]}>GUtech Finder</Text>
+          <Text style={[styles.topMeta, type === "lost" ? styles.headerMetaLost : styles.headerTextFound]}>AI Amana</Text>
+        </View>
+        <View style={styles.header}>
+          <Text style={[styles.kicker, type === "lost" ? styles.headerMetaLost : styles.headerTextFound]}>Dashboard</Text>
+          <Text style={[styles.title, type === "lost" ? styles.headerTextLost : styles.headerTextFound]}>Report Center</Text>
+          <Text style={[styles.body, type === "lost" ? styles.headerBodyLost : styles.headerBodyFound]}>
+            File a secure lost or found report. AI Amana will compare item details, location, date, and photos.
+          </Text>
+        </View>
       </View>
       <View style={styles.actionGrid}>
         <Pressable
@@ -173,14 +177,25 @@ export default function ReportScreen() {
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    minHeight: 64,
-    borderBottomWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.surfaceContainer,
+  modeHeader: {
     marginHorizontal: -20,
     marginTop: -20,
     paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 18,
+    gap: 16,
+    borderBottomWidth: 3,
+  },
+  modeHeaderLost: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryMuted,
+  },
+  modeHeaderFound: {
+    backgroundColor: colors.gold,
+    borderColor: colors.secondary,
+  },
+  topBar: {
+    minHeight: 64,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -218,6 +233,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     maxWidth: 720,
+  },
+  headerTextLost: {
+    color: "#fff",
+  },
+  headerTextFound: {
+    color: colors.secondary,
+  },
+  headerMetaLost: {
+    color: colors.goldSoft,
+  },
+  headerBodyLost: {
+    color: colors.primarySoft,
+  },
+  headerBodyFound: {
+    color: colors.secondary,
   },
   actionGrid: {
     flexDirection: "row",
