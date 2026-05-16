@@ -33,7 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="report" options={{ title: "Report", tabBarIcon: ({ color }) => <ClipboardList color={color} size={20} /> }} />
       <Tabs.Screen name="matches" options={{ title: "Matches", tabBarIcon: ({ color }) => <SearchCheck color={color} size={20} /> }} />
       <Tabs.Screen name="chats" options={{ title: "Chats", tabBarIcon: ({ color }) => <MessageCircle color={color} size={20} /> }} />
-      <Tabs.Screen name="ai-logs" options={{ title: "Logs", tabBarIcon: ({ color }) => <FileSearch color={color} size={20} /> }} />
+      <Tabs.Screen name="ai-logs" options={{ title: "Presentation", tabBarIcon: ({ color }) => <FileSearch color={color} size={20} /> }} />
       <Tabs.Screen name="my-items" options={{ title: "Items", tabBarIcon: ({ color }) => <ShieldCheck color={color} size={20} /> }} />
       <Tabs.Screen name="profile" options={{ title: profile?.role === "admin" ? "Admin" : "Profile", tabBarIcon: ({ color }) => <UserRound color={color} size={20} /> }} />
     </Tabs>
