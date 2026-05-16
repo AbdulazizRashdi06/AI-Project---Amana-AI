@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -216,6 +217,7 @@ function stringify(value: unknown): string {
 }
 
 export default function AiLogsScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { logs, loading, error } = useUserAiLogs(user?.uid);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -274,6 +276,7 @@ export default function AiLogsScreen() {
         <Text style={styles.title}>Report Matching Logs</Text>
         <Text style={styles.body}>This page explains each AI matching action in plain language for every lost and found report.</Text>
         <View style={styles.actions}>
+          <Button title="Cost Table" variant="secondary" onPress={() => router.push("/cost-table")} />
           <Button title="Clear logs" variant="ghost" onPress={() => setCleared(true)} />
           {cleared ? <Button title="Show logs" variant="secondary" onPress={() => setCleared(false)} /> : null}
         </View>
