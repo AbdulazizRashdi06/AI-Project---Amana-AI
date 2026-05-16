@@ -2,348 +2,169 @@ import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
-import { EmptyState } from "@/components/EmptyState";
 import { Screen } from "@/components/Screen";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useUserAiLogs } from "@/features/aiLogs/hooks";
-import { formatDateTime } from "@/lib/dates";
 import { colors } from "@/theme/colors";
-import type { AiLogRecord } from "@/types/domain";
 
-type StepNarrative = {
+type Slide = {
+  kicker: string;
   title: string;
-  message: string;
+  summary: string;
+  bullets: string[];
+  tags: string[];
+  spotlight?: string;
 };
 
-type CostRun = {
-  id: string;
-  reportId: string;
-  createdAt: AiLogRecord["createdAt"];
-  runCostUsd: number;
-};
-
-type CostSummary = {
-  runCount: number;
-  totalCostUsd: number;
-  averageCostUsd: number;
-  highCostThresholdUsd: number;
-  highCostRuns: CostRun[];
-  highestCostRun: CostRun | null;
-};
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
-}
-
-function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function asBoolean(value: unknown): boolean | null {
-  return typeof value === "boolean" ? value : null;
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
-}
-
-function percent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-function runCostFromLog(log: AiLogRecord): number | null {
-  if (log.step !== "process_complete") {
-    return null;
-  }
-  return asNumber(asRecord(log.output)?.run_cost_usd);
-}
-
-function highCostThresholdFromAverage(averageCostUsd: number): number {
-  return averageCostUsd * 1.5;
-}
-
-function formatUsd(value: number): string {
-  if (value >= 1) {
-    return `$${value.toFixed(4)}`;
-  }
-  return `$${value.toFixed(6)}`;
-}
-
-function describeStep(log: AiLogRecord): StepNarrative {
-  const input = asRecord(log.input);
-  const output = asRecord(log.output);
-
-  switch (log.step) {
-    case "process_started": {
-      const reportType = asString(input?.reportType);
-      return {
-        title: "Matching Started",
-        message: reportType === "lost" || reportType === "found"
-          ? `We started checking this ${reportType} report against possible matches.`
-          : "We started checking this report against possible matches.",
-      };
-    }
-    case "process_skipped":
-      return {
-        title: "Run Skipped",
-        message: "No new AI run was needed right now because this report did not require reprocessing.",
-      };
-    case "normalize_input":
-      return {
-        title: "Details Prepared",
-        message: "We cleaned and organized the report text so matching can be more accurate.",
-      };
-    case "embedding_request":
-      return {
-        title: "Understanding Item Details",
-        message: "AI is converting the report into a meaning-based representation for comparison.",
-      };
-    case "embedding_response": {
-      const localFallback = asRecord(output)?.provider === "local";
-      return {
-        title: "Item Understanding Ready",
-        message: localFallback
-          ? "The cloud AI service was unavailable, so a local fallback model was used for this step."
-          : "The item representation is ready and can now be compared with other reports.",
-      };
-    }
-    case "candidate_search": {
-      const count = asNumber(asRecord(output)?.count);
-      return {
-        title: "Possible Matches Collected",
-        message: count === null
-          ? "We collected opposite-type reports that could be related."
-          : `We found ${count} opposite-type reports to review as possible matches.`,
-      };
-    }
-    case "candidate_embedding_backfill":
-      return {
-        title: "Older Report Prepared",
-        message: "One candidate report needed background preparation before it could be compared fairly.",
-      };
-    case "candidate_score": {
-      const scoredCount = Array.isArray(log.output) ? log.output.length : null;
-      return {
-        title: "Candidates Ranked",
-        message: scoredCount === null
-          ? "We ranked candidate reports by similarity."
-          : `${scoredCount} candidate report${scoredCount === 1 ? "" : "s"} passed initial scoring and moved forward.`,
-      };
-    }
-    case "rerank_request":
-      return {
-        title: "Deep Pair Review",
-        message: "AI performed a deeper comparison on one possible lost/found pair.",
-      };
-    case "rerank_response": {
-      const result = asRecord(asRecord(output)?.result);
-      const likely = asBoolean(result?.isLikelyMatch);
-      const finalScore = asNumber(result?.finalScore);
-      if (likely === true && finalScore !== null) {
-        return {
-          title: "Deep Review Result",
-          message: `This pair looked promising with a confidence score of ${percent(finalScore)}.`,
-        };
-      }
-      if (likely === false && finalScore !== null) {
-        return {
-          title: "Deep Review Result",
-          message: `This pair looked weak after deep review (${percent(finalScore)} confidence).`,
-        };
-      }
-      return {
-        title: "Deep Review Result",
-        message: "AI returned its detailed decision for this candidate pair.",
-      };
-    }
-    case "match_created": {
-      const finalScore = asNumber(asRecord(output)?.finalScore);
-      return {
-        title: "Match Suggested",
-        message: finalScore === null
-          ? "A likely match was created and shown to users."
-          : `A likely match was created and suggested to users (${percent(finalScore)} confidence).`,
-      };
-    }
-    case "match_skipped": {
-      const reason = asString(asRecord(output)?.reason);
-      return {
-        title: "Candidate Skipped",
-        message: reason
-          ? `This candidate was skipped: ${reason}`
-          : "This candidate was skipped because it did not meet the match threshold.",
-      };
-    }
-    case "process_complete": {
-      const candidateCount = asNumber(asRecord(output)?.candidateCount);
-      const scoredCount = asNumber(asRecord(output)?.scoredCount);
-      if (candidateCount !== null && scoredCount !== null) {
-        return {
-          title: "Run Complete",
-          message: `Matching finished: ${candidateCount} candidate(s) reviewed, ${scoredCount} moved to scoring.`,
-        };
-      }
-      return {
-        title: "Run Complete",
-        message: "Matching finished for this report.",
-      };
-    }
-    case "process_error":
-      return {
-        title: "Run Failed",
-        message: log.error
-          ? `Matching failed for this run: ${log.error}`
-          : "Matching failed for this run due to an unexpected error.",
-      };
-    default:
-      return {
-        title: "AI Update",
-        message: "A matching activity was recorded for this report.",
-      };
-  }
-}
-
-function stringify(value: unknown): string {
-  return JSON.stringify(
-    value,
-    (_key, nested) => {
-      if (nested && typeof nested === "object" && "seconds" in nested && "nanoseconds" in nested) {
-        return nested;
-      }
-      return nested;
-    },
-    2,
-  );
-}
+const slides: Slide[] = [
+  {
+    kicker: "AI Amana",
+    title: "Smart Lost-And-Found",
+    summary: "Campus reports are matched automatically with a fast AI pipeline instead of manual scanning.",
+    bullets: [
+      "Students submit lost/found reports with text and photos.",
+      "System finds likely matches and suggests only strong candidates.",
+      "Admins and users review suggestions in a secure workflow.",
+    ],
+    tags: ["Real-time", "Campus-scale", "Human review"],
+    spotlight: "Pitch line: quick scan first, smart review second.",
+  },
+  {
+    kicker: "Architecture",
+    title: "Two-Stage Matching Engine",
+    summary: "We use embeddings for speed, then reasoning for quality.",
+    bullets: [
+      "Stage 1: convert report details into vectors and shortlist candidates.",
+      "Stage 2: run deep pair reasoning on shortlisted candidates only.",
+      "Final output combines similarity scores and model judgment.",
+    ],
+    tags: ["Embedding retrieval", "Reranking", "Precision at scale"],
+  },
+  {
+    kicker: "Technical Depth",
+    title: "Signal Fusion Scoring",
+    summary: "Matches are scored across multiple dimensions before AI rerank.",
+    bullets: [
+      "Cosine similarity over embeddings for semantic closeness.",
+      "Boosts for category, location, item-detail overlap, and date proximity.",
+      "Thresholding keeps weak candidates out before expensive reasoning.",
+    ],
+    tags: ["Cosine similarity", "Heuristic boosts", "Threshold control"],
+  },
+  {
+    kicker: "Reliability",
+    title: "Fallback-Ready Pipeline",
+    summary: "System remains operational even if cloud AI is unavailable.",
+    bullets: [
+      "Deterministic local fallback avoids total pipeline failure.",
+      "Per-step logs capture inputs, outputs, and errors for traceability.",
+      "Re-run support allows safe recovery and debugging.",
+    ],
+    tags: ["Resilience", "Observability", "Fault tolerance"],
+  },
+  {
+    kicker: "Cost Intelligence",
+    title: "Run-Level Cost Tracking",
+    summary: "Every run estimates spend and projects cost at higher volumes.",
+    bullets: [
+      "run_cost_usd is calculated from token usage and model rates.",
+      "Projection fields estimate cost for 6, 10, 100, 1k, 10k reports.",
+      "High-cost runs are flagged using average-based thresholds.",
+    ],
+    tags: ["Cost controls", "Budget planning", "Token analytics"],
+  },
+  {
+    kicker: "Model Lab",
+    title: "Cross-Model Cost Table",
+    summary: "Interactive table compares model spend from 10 up to 1,000,000 report comparisons.",
+    bullets: [
+      "Models include ChatGPT, Claude, Kimi, MiniMax, DeepSeek, Gemini.",
+      "Pricing inputs are editable to keep estimates current.",
+      "Table uses your real run averages, not generic assumptions.",
+    ],
+    tags: ["Comparative pricing", "Scenario simulation", "Data-driven decisions"],
+    spotlight: "Use this live during your demo to compare cost strategy in seconds.",
+  },
+  {
+    kicker: "Roadmap",
+    title: "What Comes Next",
+    summary: "This project can evolve into a production-grade AI ops platform.",
+    bullets: [
+      "Auto model routing by ambiguity and budget policies.",
+      "Evaluation harness with precision/recall benchmark sets.",
+      "PII redaction layer and trust/safety audit controls.",
+    ],
+    tags: ["Adaptive routing", "Evaluation suite", "Safety by design"],
+  },
+];
 
 export default function AiLogsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { logs, loading, error } = useUserAiLogs(user?.uid);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [cleared, setCleared] = useState(false);
-  const visibleLogs = cleared ? [] : logs;
-  const grouped = useMemo(() => {
-    const byReport = new Map<string, AiLogRecord[]>();
-    for (const log of visibleLogs) {
-      byReport.set(log.reportId, [...(byReport.get(log.reportId) ?? []), log]);
-    }
-    return Array.from(byReport.entries());
-  }, [visibleLogs]);
-  const costSummary = useMemo<CostSummary | null>(() => {
-    const runs: CostRun[] = visibleLogs
-      .map((log) => {
-        const runCostUsd = runCostFromLog(log);
-        if (runCostUsd === null) {
-          return null;
-        }
-        return {
-          id: log.id,
-          reportId: log.reportId,
-          createdAt: log.createdAt,
-          runCostUsd,
-        };
-      })
-      .filter((item): item is CostRun => item !== null);
+  const [slideIndex, setSlideIndex] = useState(0);
 
-    if (!runs.length) {
-      return null;
-    }
+  const activeSlide = slides[slideIndex];
+  const progressLabel = useMemo(() => `${slideIndex + 1} / ${slides.length}`, [slideIndex]);
 
-    const totalCostUsd = runs.reduce((sum, run) => sum + run.runCostUsd, 0);
-    const averageCostUsd = totalCostUsd / runs.length;
-    const highCostThresholdUsd = highCostThresholdFromAverage(averageCostUsd);
-    const highCostRuns = runs.filter((run) => run.runCostUsd >= highCostThresholdUsd);
-    const highestCostRun = runs.reduce<CostRun | null>(
-      (currentHighest, run) => (!currentHighest || run.runCostUsd > currentHighest.runCostUsd ? run : currentHighest),
-      null,
-    );
+  function previousSlide() {
+    setSlideIndex((current) => (current === 0 ? slides.length - 1 : current - 1));
+  }
 
-    return {
-      runCount: runs.length,
-      totalCostUsd,
-      averageCostUsd,
-      highCostThresholdUsd,
-      highCostRuns,
-      highestCostRun,
-    };
-  }, [visibleLogs]);
+  function nextSlide() {
+    setSlideIndex((current) => (current === slides.length - 1 ? 0 : current + 1));
+  }
 
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.kicker}>AI Activity Feed</Text>
-        <Text style={styles.title}>Report Matching Logs</Text>
-        <Text style={styles.body}>This page explains each AI matching action in plain language for every lost and found report.</Text>
-        <View style={styles.actions}>
-          <Button title="Cost Table" variant="secondary" onPress={() => router.push("/cost-table")} />
-          <Button title="Clear logs" variant="ghost" onPress={() => setCleared(true)} />
-          {cleared ? <Button title="Show logs" variant="secondary" onPress={() => setCleared(false)} /> : null}
-        </View>
+        <Text style={styles.kicker}>Presentation Mode</Text>
+        <Text style={styles.title}>AI Amana Project Deck</Text>
+        <Text style={styles.body}>Use this tab as your live presentation page. Swipe by buttons, tap dots to jump, and open the cost table for live pricing demos.</Text>
       </View>
-      {costSummary ? (
-        <View style={styles.costCard}>
-          <Text style={styles.costTitle}>Cost Analytics</Text>
-          <Text style={styles.costBody}>Average run cost is calculated from all completed runs with pricing data.</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>Runs: {costSummary.runCount}</Text>
-            <Text style={styles.meta}>Average: {formatUsd(costSummary.averageCostUsd)}</Text>
-            <Text style={styles.meta}>Total: {formatUsd(costSummary.totalCostUsd)}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>High-cost threshold: {formatUsd(costSummary.highCostThresholdUsd)}</Text>
-            <Text style={styles.meta}>High-cost runs: {costSummary.highCostRuns.length}</Text>
-          </View>
-          {costSummary.highestCostRun ? (
-            <Text style={styles.costAlert}>
-              Highest run: {formatUsd(costSummary.highestCostRun.runCostUsd)} on report #{costSummary.highestCostRun.reportId.slice(0, 8)} (
-              {formatDateTime(costSummary.highestCostRun.createdAt)})
-            </Text>
-          ) : null}
+
+      <View style={styles.deckCard}>
+        <View style={styles.deckAccentA} />
+        <View style={styles.deckAccentB} />
+        <View style={styles.deckTopBar}>
+          <Text style={styles.slideKicker}>{activeSlide.kicker}</Text>
+          <Text style={styles.progress}>{progressLabel}</Text>
         </View>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!loading && visibleLogs.length === 0 ? (
-        <EmptyState title="No AI logs yet" body="Create or update a lost/found report after deploying the Functions update. The next matching run will appear here." />
-      ) : null}
-      {grouped.map(([reportId, reportLogs]) => (
-        <View key={reportId} style={styles.reportGroup}>
-          <Text style={styles.reportTitle}>Report #{reportId.slice(0, 8)}</Text>
-          {reportLogs.map((log) => {
-            const expanded = expandedId === log.id;
-            const narrative = describeStep(log);
-            return (
-              <Pressable key={log.id} onPress={() => setExpandedId(expanded ? null : log.id)} style={styles.logCard}>
-                <View style={styles.logHeader}>
-                  <Text style={styles.step}>{narrative.title}</Text>
-                  <Text style={styles.time}>{formatDateTime(log.createdAt)}</Text>
-                </View>
-                <Text style={styles.storyText}>{narrative.message}</Text>
-                <View style={styles.metaRow}>
-                  {log.model ? <Text style={styles.meta}>Model: {log.model}</Text> : null}
-                  {log.matchId ? <Text style={styles.meta}>Match: {log.matchId.slice(0, 10)}</Text> : null}
-                  {log.candidateReportId ? <Text style={styles.meta}>Candidate: {log.candidateReportId.slice(0, 10)}</Text> : null}
-                </View>
-                {log.error ? <Text style={styles.error}>{log.error}</Text> : null}
-                {expanded ? (
-                  <View style={styles.payloadGrid}>
-                    <View style={styles.payload}>
-                      <Text style={styles.payloadTitle}>Input</Text>
-                      <Text selectable style={styles.code}>{stringify(log.input ?? null)}</Text>
-                    </View>
-                    <View style={styles.payload}>
-                      <Text style={styles.payloadTitle}>Output</Text>
-                      <Text selectable style={styles.code}>{stringify(log.output ?? null)}</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <Text style={styles.expandHint}>Tap for technical details</Text>
-                )}
-              </Pressable>
-            );
-          })}
+
+        <Text style={styles.slideTitle}>{activeSlide.title}</Text>
+        <Text style={styles.slideSummary}>{activeSlide.summary}</Text>
+
+        <View style={styles.bulletBlock}>
+          {activeSlide.bullets.map((bullet) => (
+            <View key={bullet} style={styles.bulletRow}>
+              <View style={styles.bulletDot} />
+              <Text style={styles.bulletText}>{bullet}</Text>
+            </View>
+          ))}
         </View>
-      ))}
+
+        <View style={styles.tagsRow}>
+          {activeSlide.tags.map((tag) => (
+            <Text key={tag} style={styles.tag}>{tag}</Text>
+          ))}
+        </View>
+
+        {activeSlide.spotlight ? <Text style={styles.spotlight}>{activeSlide.spotlight}</Text> : null}
+      </View>
+
+      <View style={styles.actions}>
+        <Button title="Previous" variant="ghost" onPress={previousSlide} />
+        <Button title="Next" variant="secondary" onPress={nextSlide} />
+        <Button title="Open Cost Table" variant="primary" onPress={() => router.push("/cost-table")} />
+      </View>
+
+      <View style={styles.pagination}>
+        {slides.map((_slide, index) => (
+          <Pressable
+            key={index}
+            onPress={() => setSlideIndex(index)}
+            accessibilityRole="button"
+            accessibilityLabel={`Go to slide ${index + 1}`}
+            style={[styles.pageDot, index === slideIndex ? styles.pageDotActive : styles.pageDotIdle]}
+          />
+        ))}
+      </View>
     </Screen>
   );
 }
@@ -367,114 +188,132 @@ const styles = StyleSheet.create({
   body: {
     color: colors.muted,
     lineHeight: 22,
-    maxWidth: 840,
+    maxWidth: 860,
+  },
+  deckCard: {
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
+    padding: 18,
+    gap: 14,
+  },
+  deckAccentA: {
+    position: "absolute",
+    right: -40,
+    top: -34,
+    width: 140,
+    height: 140,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,199,3,0.18)",
+  },
+  deckAccentB: {
+    position: "absolute",
+    left: -30,
+    bottom: -36,
+    width: 120,
+    height: 120,
+    borderRadius: 999,
+    backgroundColor: "rgba(213,227,255,0.14)",
+  },
+  deckTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  slideKicker: {
+    color: colors.goldSoft,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  progress: {
+    color: colors.primarySoft,
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  slideTitle: {
+    color: "#ffffff",
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "900",
+    maxWidth: 900,
+  },
+  slideSummary: {
+    color: colors.primarySoft,
+    lineHeight: 22,
+    fontSize: 16,
+    maxWidth: 920,
+  },
+  bulletBlock: {
+    gap: 8,
+  },
+  bulletRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  bulletDot: {
+    marginTop: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: colors.gold,
+  },
+  bulletText: {
+    flex: 1,
+    color: "#ffffff",
+    lineHeight: 21,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 2,
+  },
+  tag: {
+    color: colors.secondary,
+    backgroundColor: colors.gold,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  spotlight: {
+    color: colors.goldSoft,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,223,148,0.4)",
+    backgroundColor: "rgba(255,223,148,0.08)",
+    padding: 10,
+    lineHeight: 20,
+    fontWeight: "700",
   },
   actions: {
     flexDirection: "row",
     gap: 8,
     flexWrap: "wrap",
   },
-  costCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 14,
-    gap: 10,
-  },
-  costTitle: {
-    color: colors.primary,
-    fontWeight: "900",
-    fontSize: 18,
-  },
-  costBody: {
-    color: colors.muted,
-    lineHeight: 21,
-  },
-  costAlert: {
-    color: colors.amber,
-    fontWeight: "800",
-  },
-  reportGroup: {
-    gap: 10,
-  },
-  reportTitle: {
-    color: colors.primary,
-    fontWeight: "900",
-    fontSize: 18,
-  },
-  logCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 14,
-    gap: 10,
-  },
-  logHeader: {
+  pagination: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  step: {
-    color: colors.ink,
-    fontWeight: "900",
-    textTransform: "capitalize",
-  },
-  time: {
-    color: colors.outline,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    justifyContent: "center",
     gap: 8,
+    marginTop: 2,
   },
-  meta: {
-    color: colors.primary,
-    backgroundColor: colors.primarySoft,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 12,
-    fontWeight: "800",
+  pageDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 99,
   },
-  error: {
-    color: colors.danger,
+  pageDotActive: {
+    backgroundColor: colors.primary,
   },
-  storyText: {
-    color: colors.ink,
-    lineHeight: 21,
-  },
-  expandHint: {
-    color: colors.muted,
-    fontSize: 13,
-  },
-  payloadGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  payload: {
-    flex: 1,
-    minWidth: 280,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 8,
-    padding: 12,
-    gap: 8,
-  },
-  payloadTitle: {
-    color: colors.primary,
-    textTransform: "uppercase",
-    fontWeight: "900",
-    letterSpacing: 0.8,
-    fontSize: 12,
-  },
-  code: {
-    color: colors.ink,
-    fontFamily: "monospace",
-    fontSize: 12,
-    lineHeight: 18,
+  pageDotIdle: {
+    backgroundColor: colors.border,
   },
 });
