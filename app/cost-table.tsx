@@ -24,11 +24,14 @@ type ModelPricing = {
 
 type UsageProfile = {
   runCount: number;
-  comparedCount: number;
-  embeddingInputPerCompared: number;
-  reasoningInputPerCompared: number;
-  reasoningCachedPerCompared: number;
-  reasoningOutputPerCompared: number;
+  candidateCount: number;
+  scoredCount: number;
+  avgCandidatesPerRun: number;
+  avgShortlistedPerRun: number;
+  embeddingInputPerRun: number;
+  reasoningInputPerShortlisted: number;
+  reasoningCachedPerShortlisted: number;
+  reasoningOutputPerShortlisted: number;
 };
 
 const MODEL_PRICING_SEEDS: ModelPricingSeed[] = [
@@ -117,7 +120,8 @@ function formatUsd(value: number): string {
 
 function computeUsageProfile(logs: AiLogRecord[]): UsageProfile | null {
   let runCount = 0;
-  let comparedCount = 0;
+  let candidateCount = 0;
+  let scoredCount = 0;
   let embeddingInputTotal = 0;
   let reasoningInputTotal = 0;
   let reasoningCachedTotal = 0;
@@ -134,42 +138,47 @@ function computeUsageProfile(logs: AiLogRecord[]): UsageProfile | null {
       continue;
     }
 
-    const comparedFromProjection = asNumber(asRecord(output?.comparison_cost_projection)?.compared_count_in_this_run);
-    const comparedFromScore = asNumber(output?.scoredCount);
-    const compared = comparedFromProjection ?? comparedFromScore ?? 0;
+    const candidatesInRun = asNumber(output?.candidateCount) ?? 0;
+    const shortlistedInRun = asNumber(output?.scoredCount) ?? 0;
 
     const embeddingInput = asNumber(usageTokens.embedding_input_tokens) ?? 0;
     const reasoningInput = asNumber(usageTokens.reasoning_input_tokens) ?? 0;
     const reasoningCached = asNumber(usageTokens.reasoning_cached_input_tokens) ?? 0;
     const reasoningOutput = asNumber(usageTokens.reasoning_output_tokens) ?? 0;
 
-    if (compared <= 0) {
+    if (candidatesInRun <= 0) {
       continue;
     }
 
     runCount += 1;
-    comparedCount += compared;
+    candidateCount += candidatesInRun;
+    scoredCount += shortlistedInRun;
     embeddingInputTotal += embeddingInput;
     reasoningInputTotal += reasoningInput;
     reasoningCachedTotal += reasoningCached;
     reasoningOutputTotal += reasoningOutput;
   }
 
-  if (!runCount || !comparedCount) {
+  if (!runCount) {
     return null;
   }
 
+  const safeShortlistedCount = Math.max(1, scoredCount);
+
   return {
     runCount,
-    comparedCount,
-    embeddingInputPerCompared: embeddingInputTotal / comparedCount,
-    reasoningInputPerCompared: reasoningInputTotal / comparedCount,
-    reasoningCachedPerCompared: reasoningCachedTotal / comparedCount,
-    reasoningOutputPerCompared: reasoningOutputTotal / comparedCount,
+    candidateCount,
+    scoredCount,
+    avgCandidatesPerRun: candidateCount / runCount,
+    avgShortlistedPerRun: scoredCount / runCount,
+    embeddingInputPerRun: embeddingInputTotal / runCount,
+    reasoningInputPerShortlisted: reasoningInputTotal / safeShortlistedCount,
+    reasoningCachedPerShortlisted: reasoningCachedTotal / safeShortlistedCount,
+    reasoningOutputPerShortlisted: reasoningOutputTotal / safeShortlistedCount,
   };
 }
 
-function estimateCostForReportCount(
+function estimateCostNoEmbedding(
   profile: UsageProfile,
   pricing: ModelPricing,
   reportCount: number,
@@ -182,15 +191,43 @@ function estimateCostForReportCount(
 
   const cachedInputPer1M = toNonNegativeNumber(pricing.cachedInputPer1M) ?? inputPer1M;
   const million = 1_000_000;
-  const billableReasoningInputPerCompared = Math.max(0, profile.reasoningInputPerCompared - profile.reasoningCachedPerCompared);
-  const billableInputPerCompared = profile.embeddingInputPerCompared + billableReasoningInputPerCompared;
+  const billableReasoningInputPerShortlisted = Math.max(0, profile.reasoningInputPerShortlisted - profile.reasoningCachedPerShortlisted);
+  const billableInputPerRun = billableReasoningInputPerShortlisted * profile.avgCandidatesPerRun;
+  const cachedInputPerRun = profile.reasoningCachedPerShortlisted * profile.avgCandidatesPerRun;
+  const outputPerRun = profile.reasoningOutputPerShortlisted * profile.avgCandidatesPerRun;
 
-  const costPerCompared =
-    (billableInputPerCompared / million) * inputPer1M +
-    (profile.reasoningCachedPerCompared / million) * cachedInputPer1M +
-    (profile.reasoningOutputPerCompared / million) * outputPer1M;
+  const costPerRun =
+    (billableInputPerRun / million) * inputPer1M +
+    (cachedInputPerRun / million) * cachedInputPer1M +
+    (outputPerRun / million) * outputPer1M;
 
-  return costPerCompared * reportCount;
+  return costPerRun * reportCount;
+}
+
+function estimateCostWithEmbedding(
+  profile: UsageProfile,
+  pricing: ModelPricing,
+  reportCount: number,
+): number | null {
+  const inputPer1M = toNonNegativeNumber(pricing.inputPer1M);
+  const outputPer1M = toNonNegativeNumber(pricing.outputPer1M);
+  if (inputPer1M === null || outputPer1M === null) {
+    return null;
+  }
+
+  const cachedInputPer1M = toNonNegativeNumber(pricing.cachedInputPer1M) ?? inputPer1M;
+  const million = 1_000_000;
+  const billableReasoningInputPerShortlisted = Math.max(0, profile.reasoningInputPerShortlisted - profile.reasoningCachedPerShortlisted);
+  const billableInputPerRun = profile.embeddingInputPerRun + billableReasoningInputPerShortlisted * profile.avgShortlistedPerRun;
+  const cachedInputPerRun = profile.reasoningCachedPerShortlisted * profile.avgShortlistedPerRun;
+  const outputPerRun = profile.reasoningOutputPerShortlisted * profile.avgShortlistedPerRun;
+
+  const costPerRun =
+    (billableInputPerRun / million) * inputPer1M +
+    (cachedInputPerRun / million) * cachedInputPer1M +
+    (outputPerRun / million) * outputPer1M;
+
+  return costPerRun * reportCount;
 }
 
 export default function CostTableScreen() {
@@ -227,7 +264,7 @@ export default function CostTableScreen() {
         <Text style={styles.kicker}>AI Cost Planner</Text>
         <Text style={styles.title}>Model vs Report Count</Text>
         <Text style={styles.body}>
-          This table projects total cost by model and number of compared reports, using average token usage from your own completed runs.
+          This page projects cost using your own run logs, and shows two scenarios: without embedding pre-filter and with embedding pre-filter.
         </Text>
       </View>
 
@@ -245,20 +282,21 @@ export default function CostTableScreen() {
           <Text style={styles.sectionTitle}>Average Token Baseline</Text>
           <View style={styles.metaRow}>
             <Text style={styles.meta}>Runs used: {profile.runCount}</Text>
-            <Text style={styles.meta}>Compared reports: {profile.comparedCount.toLocaleString()}</Text>
+            <Text style={styles.meta}>Candidates reviewed: {profile.candidateCount.toLocaleString()}</Text>
+            <Text style={styles.meta}>Shortlisted pairs: {profile.scoredCount.toLocaleString()}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.meta}>Embed/report: {profile.embeddingInputPerCompared.toFixed(1)}</Text>
-            <Text style={styles.meta}>Input/report: {profile.reasoningInputPerCompared.toFixed(1)}</Text>
-            <Text style={styles.meta}>Cached/report: {profile.reasoningCachedPerCompared.toFixed(1)}</Text>
-            <Text style={styles.meta}>Output/report: {profile.reasoningOutputPerCompared.toFixed(1)}</Text>
+            <Text style={styles.meta}>Avg candidates/run: {profile.avgCandidatesPerRun.toFixed(2)}</Text>
+            <Text style={styles.meta}>Avg shortlist/run: {profile.avgShortlistedPerRun.toFixed(2)}</Text>
+            <Text style={styles.meta}>Embed input/run: {profile.embeddingInputPerRun.toFixed(1)}</Text>
+            <Text style={styles.meta}>Reasoning input/shortlist: {profile.reasoningInputPerShortlisted.toFixed(1)}</Text>
           </View>
         </View>
       ) : null}
 
       {profile ? (
         <View style={styles.tableCard}>
-          <Text style={styles.sectionTitle}>Cost Table (USD)</Text>
+          <Text style={styles.sectionTitle}>No Embedding Cost Table (USD)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableScrollContent}>
             <View style={styles.table}>
               <View style={styles.tableHeaderRow}>
@@ -271,7 +309,36 @@ export default function CostTableScreen() {
                 <View key={seed.id} style={styles.tableRow}>
                   <Text style={[styles.tableModelCell, styles.modelCol]}>{seed.label}</Text>
                   {REPORT_COUNTS.map((count) => {
-                    const estimate = estimateCostForReportCount(profile, pricingByModel[seed.id], count);
+                    const estimate = estimateCostNoEmbedding(profile, pricingByModel[seed.id], count);
+                    return (
+                      <Text key={count} style={[styles.tableValueCell, styles.valueCol]}>
+                        {estimate === null ? "Set price" : formatUsd(estimate)}
+                      </Text>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
+
+      {profile ? (
+        <View style={styles.tableCard}>
+          <Text style={styles.sectionTitle}>With Embedding Cost Table (USD)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableScrollContent}>
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, styles.modelCol]}>Model</Text>
+                {REPORT_COUNTS.map((count) => (
+                  <Text key={count} style={[styles.tableHeaderCell, styles.valueCol]}>{count.toLocaleString()}</Text>
+                ))}
+              </View>
+              {MODEL_PRICING_SEEDS.map((seed) => (
+                <View key={seed.id} style={styles.tableRow}>
+                  <Text style={[styles.tableModelCell, styles.modelCol]}>{seed.label}</Text>
+                  {REPORT_COUNTS.map((count) => {
+                    const estimate = estimateCostWithEmbedding(profile, pricingByModel[seed.id], count);
                     return (
                       <Text key={count} style={[styles.tableValueCell, styles.valueCol]}>
                         {estimate === null ? "Set price" : formatUsd(estimate)}
